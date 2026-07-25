@@ -1,4 +1,4 @@
-# ThunderAfkZone
+# ThunderAfkZone It is incomplete right now !!!
 
 Custom AFK-zone plugin for Paper 1.21+ servers.  
 Define zones (via a WorldEdit selection) and configure per-reward interval and one-time timers, with a MiniMessage-based countdown display.
