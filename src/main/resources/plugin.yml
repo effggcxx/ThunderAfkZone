@@ -30,6 +30,23 @@ permissions:
   afkzone.reward.give:
     description: Allows manually giving a configured reward to a player
     default: op
-  afkzone.zonereward:
-    description: Allows managing per-zone reward assignments
+  afkzone.zonereward.list:
+    description: Allows viewing per-zone reward assignments
     default: op
+  afkzone.zonereward.add:
+    description: Allows adding rewards to a zone
+    default: op
+  afkzone.zonereward.remove:
+    description: Allows removing rewards from a zone
+    default: op
+  afkzone.zonereward.clear:
+    description: Allows clearing all reward restrictions from a zone
+    default: op
+  afkzone.zonereward:
+    description: Allows managing per-zone reward assignments (all sub-permissions)
+    default: op
+    children:
+      afkzone.zonereward.list: true
+      afkzone.zonereward.add: true
+      afkzone.zonereward.remove: true
+      afkzone.zonereward.clear: true

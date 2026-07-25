@@ -185,10 +185,6 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleZoneRewardCommand(CommandSender sender, String[] args) {
-        if (!sender.hasPermission("afkzone.zonereward")) {
-            sender.sendMessage("§cYou don't have permission.");
-            return true;
-        }
         if (args.length < 2) {
             sender.sendMessage("§cUsage: /afkzone zonereward list <zone> | add <zone> <reward> | remove <zone> <reward> | clear <zone>");
             return true;
@@ -197,6 +193,10 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
 
         switch (act) {
             case "list" -> {
+                if (!sender.hasPermission("afkzone.zonereward.list")) {
+                    sender.sendMessage("§cYou don't have permission.");
+                    return true;
+                }
                 if (args.length < 3) {
                     sender.sendMessage("§cUsage: /afkzone zonereward list <zone>");
                     return true;
@@ -220,6 +220,10 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             case "add" -> {
+                if (!sender.hasPermission("afkzone.zonereward.add")) {
+                    sender.sendMessage("§cYou don't have permission.");
+                    return true;
+                }
                 if (args.length < 4) {
                     sender.sendMessage("§cUsage: /afkzone zonereward add <zone> <reward>");
                     return true;
@@ -242,6 +246,10 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             case "remove" -> {
+                if (!sender.hasPermission("afkzone.zonereward.remove")) {
+                    sender.sendMessage("§cYou don't have permission.");
+                    return true;
+                }
                 if (args.length < 4) {
                     sender.sendMessage("§cUsage: /afkzone zonereward remove <zone> <reward>");
                     return true;
@@ -260,6 +268,10 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             case "clear" -> {
+                if (!sender.hasPermission("afkzone.zonereward.clear")) {
+                    sender.sendMessage("§cYou don't have permission.");
+                    return true;
+                }
                 if (args.length < 3) {
                     sender.sendMessage("§cUsage: /afkzone zonereward clear <zone>");
                     return true;
@@ -362,7 +374,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 2) {
             switch (sub) {
-                case "info", "remove", "delete" -> {
+                case "info", "remove", "delete", "create" -> {
                     return filter(new ArrayList<>(zoneManager.getZoneNames()), args[1]);
                 }
                 case "reward" -> {
