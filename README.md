@@ -1,0 +1,2 @@
+# ThunderAfkzone
+cool afk zoone
