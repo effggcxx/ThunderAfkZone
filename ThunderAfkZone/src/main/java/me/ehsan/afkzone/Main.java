@@ -206,48 +206,75 @@ public class Main extends JavaPlugin {
 		// If executor is console and a raw command is provided, run that (with {player} placeholder)
 		if ((r.executor == null || r.executor.equalsIgnoreCase("console")) && r.command != null && !r.command.isEmpty()) {
 			String consoleCmd = r.command.replace("{player}", player.getName()).replace("{award}", r.name);
-			getServer().dispatchCommand(getServer().getConsoleSender(), consoleCmd);
-			player.sendMessage("You received reward: " + r.name);
-			if (rewardSound != null) player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
+			boolean ok = dispatchAndCheck(consoleCmd, r.name);
+			if (ok) {
+				player.sendMessage("You received reward: " + r.name);
+				if (rewardSound != null) player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
+			} else {
+				player.sendMessage("Reward '" + r.name + "' could not be delivered. Please contact staff.");
+			}
 			return;
 		}
 		try {
 			String ex = r.executor == null ? "console" : r.executor.toLowerCase();
+			boolean ok = true;
 			switch (ex) {
 				case "itemedit": {
 					String dispatch = "si give " + player.getName() + " " + r.itemName + " " + r.amount;
-					getServer().dispatchCommand(getServer().getConsoleSender(), dispatch);
+					ok = dispatchAndCheck(dispatch, r.name);
 					break;
 				}
 				case "item":
 				case "itemadder": {
 					// legacy support
 					String dispatch = "itemadder give " + player.getName() + " " + r.itemName + " " + r.amount;
-					getServer().dispatchCommand(getServer().getConsoleSender(), dispatch);
+					ok = dispatchAndCheck(dispatch, r.name);
 					break;
 				}
 				case "vanilla":
 				case "give": {
 					// vanilla give: give <player> <command>
 					String giveCmd = "give " + player.getName() + " " + r.itemName + " " + r.amount;
-					getServer().dispatchCommand(getServer().getConsoleSender(), giveCmd);
+					ok = dispatchAndCheck(giveCmd, r.name);
 					break;
 				}
 				default: {
 					// run arbitrary console command
 					if (r.command != null && !r.command.isEmpty()) {
 						String fallback = r.command.replace("{player}", player.getName()).replace("{award}", r.name);
-						getServer().dispatchCommand(getServer().getConsoleSender(), fallback);
+						ok = dispatchAndCheck(fallback, r.name);
 					}
 					break;
 				}
 			}
-			player.sendMessage("You received reward: " + r.name);
-			if (rewardSound != null) {
-				player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
+			if (ok) {
+				player.sendMessage("You received reward: " + r.name);
+				if (rewardSound != null) {
+					player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
+				}
+			} else {
+				player.sendMessage("Reward '" + r.name + "' could not be delivered. Please contact staff.");
 			}
 		} catch (Exception ex) {
 			getLogger().severe("Failed to give reward " + r.name + ": " + ex.getMessage());
+			player.sendMessage("Reward '" + r.name + "' could not be delivered. Please contact staff.");
+		}
+	}
+
+	/**
+	 * Dispatches a console command and logs a warning if the command handler
+	 * reports failure (returns false), instead of silently swallowing it.
+	 */
+	private boolean dispatchAndCheck(String command, String rewardName) {
+		try {
+			boolean result = getServer().dispatchCommand(getServer().getConsoleSender(), command);
+			if (!result) {
+				getLogger().warning("Command for reward '" + rewardName + "' returned failure: /" + command);
+			}
+			return result;
+		} catch (Exception ex) {
+			getLogger().severe("Exception dispatching command for reward '" + rewardName + "': /" + command + " - " + ex.getMessage());
+			return false;
 		}
 	}
 

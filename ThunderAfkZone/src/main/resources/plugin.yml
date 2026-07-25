@@ -2,7 +2,21 @@ name: AfkZone
 version: 1.1-beta
 main: me.ehsan.afkzone.Main
 api-version: "1.21"
+softdepend: [WorldEdit]
 commands:
-	afkzone:
-		description: Manage AFK zones
-		usage: /afkzone create <name>
+  afkzone:
+    description: Manage AFK zones
+    usage: /afkzone create <name> | list | remove <name> | reload | reward list|give <reward> [player]
+permissions:
+  afkzone.create:
+    description: Allows creating AFK zones with a WorldEdit selection
+    default: op
+  afkzone.reload:
+    description: Allows reloading the AfkZone configuration
+    default: op
+  afkzone.reward.list:
+    description: Allows listing configured rewards
+    default: op
+  afkzone.reward.give:
+    description: Allows manually giving a configured reward to a player
+    default: op

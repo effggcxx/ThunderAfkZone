@@ -1,38 +1,38 @@
 # AfkZone plugin configuration - rewards schema
 global:
-	# When multiple rewards are eligible at the same moment, choose behavior:
-	# "all" - give all eligible rewards
-	# "highest" - give only the reward with the highest priority
-	on_multiple: "all"
-	# Seconds of inactivity before a player is considered AFK for rewards
-	afk_threshold_seconds: 60
-	# Sound played when a player enters a zone
-	enter_sound: "ENTITY_PLAYER_LEVELUP"
-	# Sound played when a player exits a zone
-	exit_sound: "ENTITY_ITEM_BREAK"
-	# Sound played when a player receives a reward
-	reward_sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
-	# Sound volume and pitch for all zone sounds
-	sound_volume: 1.0
-	sound_pitch: 1.0
+  # When multiple rewards are eligible at the same moment, choose behavior:
+  # "all" - give all eligible rewards
+  # "highest" - give only the reward with the highest priority
+  on_multiple: "all"
+  # Seconds of inactivity before a player is considered AFK for rewards
+  afk_threshold_seconds: 60
+  # Sound played when a player enters a zone
+  enter_sound: "ENTITY_PLAYER_LEVELUP"
+  # Sound played when a player exits a zone
+  exit_sound: "ENTITY_ITEM_BREAK"
+  # Sound played when a player receives a reward
+  reward_sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
+  # Sound volume and pitch for all zone sounds
+  sound_volume: 1.0
+  sound_pitch: 1.0
 
-	# Timer display settings for AFK reward countdown
-	timer:
-		enabled: true
-		template: "<yellow><bold>Next reward in <timer></bold></yellow>"
-		display: "title"
-		size: "big"
-		title:
-			fade_in: 5
-			stay: 40
-			fade_out: 5
+  # Timer display settings for AFK reward countdown
+  timer:
+    enabled: true
+    template: "<yellow><bold>Next reward in <timer></bold></yellow>"
+    display: "title"
+    size: "big"
+    title:
+      fade_in: 5
+      stay: 40
+      fade_out: 5
 
-	# Supported placeholders: <timer>
-	# Supported display values: title, actionbar, chat
-	# Supported size values: big, mini
-	# Default size is big.
-	# Use MiniMessage tags and hex colors inside the template.
-	# Invalid sound names are now warned during config reload.
+  # Supported placeholders: <timer>
+  # Supported display values: title, actionbar, chat
+  # Supported size values: big, mini
+  # Default size is big.
+  # Use MiniMessage tags and hex colors inside the template.
+  # Invalid sound names are now warned during config reload.
 
 # Define as many rewards as you like under `rewards`.
 # New reward schema fields:
@@ -44,23 +44,23 @@ global:
 # - priority: integer priority used when `global.on_multiple: "highest"`
 # Example rewards:
 rewards:
-	welcome_diamond:
-		description: "Give a diamond to the player"
-		executor: "give" # vanilla give -> /give <player> <item> <amount>
-		item: "diamond"
-		amount: 1
-		interval_seconds: 0
-		once_after_seconds: 0
-		priority: 5
+  welcome_diamond:
+    description: "Give a diamond to the player"
+    executor: "give" # vanilla give -> /give <player> <item> <amount>
+    item: "diamond"
+    amount: 1
+    interval_seconds: 0
+    once_after_seconds: 0
+    priority: 5
 
-	starter_kit:
-		description: "Give starter items via ItemEdit"
-		executor: "itemedit" # ItemEdit uses `/si give <player> <item> <amount>`
-		item: "starter_item"
-		amount: 1
-		interval_seconds: 0
-		once_after_seconds: 0
-		priority: 1
+  starter_kit:
+    description: "Give starter items via ItemEdit"
+    executor: "itemedit" # ItemEdit uses `/si give <player> <item> <amount>`
+    item: "starter_item"
+    amount: 1
+    interval_seconds: 0
+    once_after_seconds: 0
+    priority: 1
 
 # Notes:
 # - Use `executor: itemedit` to dispatch `si give <player> <item> <amount>`.
