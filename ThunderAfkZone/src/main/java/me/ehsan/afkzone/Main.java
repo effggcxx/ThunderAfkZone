@@ -29,7 +29,9 @@ public class Main extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ActivityListener(rewardManager), this);
 
         if (getCommand("afkzone") != null) {
-            getCommand("afkzone").setExecutor(new AfkZoneCommand(this, zoneManager, rewardManager));
+            AfkZoneCommand cmd = new AfkZoneCommand(this, zoneManager, rewardManager);
+            getCommand("afkzone").setExecutor(cmd);
+            getCommand("afkzone").setTabCompleter(cmd);
         }
 
         getLogger().info("ThunderAfkZone enabled");
