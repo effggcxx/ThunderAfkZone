@@ -6,6 +6,29 @@ global:
 	on_multiple: "all"
 	# Seconds of inactivity before a player is considered AFK for rewards
 	afk_threshold_seconds: 60
+	# Sound played when a player enters a zone
+	enter_sound: "ENTITY_PLAYER_LEVELUP"
+	# Sound played when a player exits a zone
+	exit_sound: "ENTITY_ITEM_BREAK"
+	# Sound played when a player receives a reward
+	reward_sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
+	# Sound volume and pitch for all zone sounds
+	sound_volume: 1.0
+	sound_pitch: 1.0
+
+	# Timer display settings for AFK reward countdown.
+	# Supported placeholders: <timer>
+	# Supported display values: title, actionbar, chat
+	# Supported size values: big, mini
+	# Default size is big.
+	# Use MiniMessage tags and hex colors inside the template.
+	# Example: timer.template: "<yellow><bold>Next reward in <timer></bold></yellow>"
+	# Example: timer.display: "actionbar"
+	# Example: timer.size: "mini"
+	# Example: timer.title.fade_in: 5
+	# Example: timer.title.stay: 40
+	# Example: timer.title.fade_out: 5
+	# Invalid sound names are now warned during config reload.
 
 # Define as many rewards as you like under `rewards`.
 # New reward schema fields:

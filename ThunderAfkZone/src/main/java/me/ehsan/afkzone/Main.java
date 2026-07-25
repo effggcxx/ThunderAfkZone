@@ -12,6 +12,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.UUID;
@@ -20,11 +21,17 @@ import java.util.stream.Collectors;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Locale;
 
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
+import org.bukkit.Sound;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.title.Title;
+import net.kyori.adventure.util.Ticks;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
@@ -61,13 +68,26 @@ public class Main extends JavaPlugin {
 	private String onMultiple = "all";
 	private Map<UUID, Long> lastActive = new ConcurrentHashMap<>();
 	private int afkThresholdSeconds = 60;
+	private Sound enterSound = null;
+	private Sound exitSound = null;
+	private Sound rewardSound = null;
+	private float soundVolume = 1.0f;
+	private float soundPitch = 1.0f;
+
+	private boolean timerEnabled = true;
+	private String timerTemplate = "<gold><bold>Next reward in <timer></bold></gold>";
+	private String timerDisplay = "title";
+	private String timerSize = "big";
+	private int timerTitleFadeIn = 5;
+	private int timerTitleStay = 40;
+	private int timerTitleFadeOut = 5;
+	private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
 	@Override
 	public void onEnable() {
 		saveDefaultConfig();
 		loadRewards();
-		this.onMultiple = getConfig().getString("global.on_multiple", "all");
-		this.afkThresholdSeconds = getConfig().getInt("global.afk_threshold_seconds", 60);
+		loadGlobalConfig();
 		getServer().getPluginManager().registerEvents(new ZoneListener(), this);
 		getServer().getPluginManager().registerEvents(new ActivityListener(), this);
 		loadZonesFile();
@@ -97,6 +117,90 @@ public class Main extends JavaPlugin {
 		getLogger().info("Loaded " + rewards.size() + " rewards");
 	}
 
+	private void loadGlobalConfig() {
+		this.onMultiple = getConfig().getString("global.on_multiple", "all");
+		this.afkThresholdSeconds = getConfig().getInt("global.afk_threshold_seconds", 60);
+		this.enterSound = parseSound(getConfig().getString("global.enter_sound", "ENTITY_PLAYER_LEVELUP"), "global.enter_sound");
+		this.exitSound = parseSound(getConfig().getString("global.exit_sound", "ENTITY_ITEM_BREAK"), "global.exit_sound");
+		this.rewardSound = parseSound(getConfig().getString("global.reward_sound", "ENTITY_EXPERIENCE_ORB_PICKUP"), "global.reward_sound");
+		this.soundVolume = (float) getConfig().getDouble("global.sound_volume", 1.0);
+		this.soundPitch = (float) getConfig().getDouble("global.sound_pitch", 1.0);
+		this.timerEnabled = getConfig().getBoolean("global.timer.enabled", true);
+		this.timerTemplate = getConfig().getString("global.timer.template", "<gold><bold>Next reward in <timer></bold></gold>");
+		this.timerDisplay = getConfig().getString("global.timer.display", "title");
+		this.timerSize = getConfig().getString("global.timer.size", "big");
+		this.timerTitleFadeIn = getConfig().getInt("global.timer.title.fade_in", 5);
+		this.timerTitleStay = getConfig().getInt("global.timer.title.stay", 40);
+		this.timerTitleFadeOut = getConfig().getInt("global.timer.title.fade_out", 5);
+	}
+
+	private Sound parseSound(String soundName, String configPath) {
+		if (soundName == null || soundName.isEmpty()) return null;
+		try {
+			return Sound.valueOf(soundName.toUpperCase(Locale.ROOT).trim());
+		} catch (IllegalArgumentException ex) {
+			getLogger().warning("Invalid sound name in config path " + configPath + ": '" + soundName + "'. Sound disabled.");
+			return null;
+		}
+	}
+
+	private String formatTime(long seconds) {
+		if (seconds <= 0) return "0s";
+		if (seconds >= 60) {
+			long mins = seconds / 60;
+			long secs = seconds % 60;
+			return mins + ":" + String.format("%02d", secs);
+		}
+		return seconds + "s";
+	}
+
+	private Component buildTimerComponent(long secondsRemaining) {
+		String text = timerTemplate.replace("<timer>", formatTime(secondsRemaining));
+		if ("mini".equalsIgnoreCase(timerSize)) {
+			text = "<gray><italic>" + text + "</italic></gray>";
+		} else if ("big".equalsIgnoreCase(timerSize)) {
+			text = "<gold><bold>" + text + "</bold></gold>";
+		}
+		try {
+			return miniMessage.deserialize(text);
+		} catch (Exception ex) {
+			return Component.text("Next reward in " + formatTime(secondsRemaining));
+		}
+	}
+
+	private void sendTimer(Player player, long secondsRemaining) {
+		if (!timerEnabled) return;
+		Component component = buildTimerComponent(secondsRemaining);
+		switch (timerDisplay.toLowerCase(Locale.ROOT)) {
+			case "actionbar":
+				player.sendActionBar(component);
+				break;
+			case "chat":
+				player.sendMessage(component);
+				break;
+			default:
+				player.showTitle(Title.title(component, Component.empty(), Title.Times.times(Duration.ofMillis(timerTitleFadeIn * 50L), Duration.ofMillis(timerTitleStay * 50L), Duration.ofMillis(timerTitleFadeOut * 50L))));
+				break;
+		}
+	}
+
+	private long getNearestRewardSecondsRemaining(Map<String, Integer> prog, Set<String> given) {
+		long nearest = Long.MAX_VALUE;
+		for (Reward r : rewards.values()) {
+			int current = prog.getOrDefault(r.name, 0);
+			if (r.onceAfterSeconds > 0 && !given.contains(r.name)) {
+				long remaining = r.onceAfterSeconds - current;
+				if (remaining >= 0 && remaining < nearest) nearest = remaining;
+			}
+			if (r.intervalSeconds > 0) {
+				long remaining = r.intervalSeconds - (current % r.intervalSeconds);
+				if (remaining == r.intervalSeconds) remaining = r.intervalSeconds;
+				if (remaining >= 0 && remaining < nearest) nearest = remaining;
+			}
+		}
+		return nearest == Long.MAX_VALUE ? 0 : nearest;
+	}
+
 	private void giveRewardToPlayer(Reward r, Player player) {
 		if (r == null || player == null) return;
 		// If executor is console and a raw command is provided, run that (with {player} placeholder)
@@ -104,6 +208,7 @@ public class Main extends JavaPlugin {
 			String consoleCmd = r.command.replace("{player}", player.getName()).replace("{award}", r.name);
 			getServer().dispatchCommand(getServer().getConsoleSender(), consoleCmd);
 			player.sendMessage("You received reward: " + r.name);
+			if (rewardSound != null) player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
 			return;
 		}
 		try {
@@ -138,6 +243,9 @@ public class Main extends JavaPlugin {
 				}
 			}
 			player.sendMessage("You received reward: " + r.name);
+			if (rewardSound != null) {
+				player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
+			}
 		} catch (Exception ex) {
 			getLogger().severe("Failed to give reward " + r.name + ": " + ex.getMessage());
 		}
@@ -180,8 +288,7 @@ public class Main extends JavaPlugin {
 			}
 			reloadConfig();
 			loadRewards();
-			this.onMultiple = getConfig().getString("global.on_multiple", "all");
-			this.afkThresholdSeconds = getConfig().getInt("global.afk_threshold_seconds", 60);
+			loadGlobalConfig();
 			loadZonesFile();
 			sender.sendMessage("AfkZone configuration reloaded.");
 			return true;
@@ -355,7 +462,7 @@ public class Main extends JavaPlugin {
 			for (Reward r : rewards.values()) {
 				int t = prog.getOrDefault(r.name, 0);
 				if (r.onceAfterSeconds > 0 && !given.contains(r.name) && t >= r.onceAfterSeconds) due.add(r);
-				if (r.intervalSeconds > 0 && r.intervalSeconds > 0 && t > 0 && t % r.intervalSeconds == 0) due.add(r);
+				if (r.intervalSeconds > 0 && t > 0 && t % r.intervalSeconds == 0) due.add(r);
 			}
 			if (!due.isEmpty()) {
 				if ("highest".equalsIgnoreCase(onMultiple)) {
@@ -367,9 +474,16 @@ public class Main extends JavaPlugin {
 					if (r.onceAfterSeconds > 0) given.add(r.name);
 				}
 			}
+			long nextReward = getNearestRewardSecondsRemaining(prog, given);
+			if (timerEnabled && nextReward > 0) {
+				sendTimer(player, nextReward);
+			}
 		}, 20L, 20L);
 		playerTasks.put(id, task);
 		player.sendMessage("Entered AFK zone: " + zoneName);
+		if (enterSound != null) {
+			player.playSound(player.getLocation(), enterSound, soundVolume, soundPitch);
+		}
 	}
 
 	private void stopTrackingPlayer(UUID id) {
@@ -377,7 +491,11 @@ public class Main extends JavaPlugin {
 		if (t != null) t.cancel();
 		playerProgress.remove(id);
 		playerGivenOnce.remove(id);
-		playerZone.remove(id);
+		String zone = playerZone.remove(id);
+		Player player = Bukkit.getPlayer(id);
+		if (player != null && zone != null && exitSound != null) {
+			player.playSound(player.getLocation(), exitSound, soundVolume, soundPitch);
+		}
 	}
 
 	private class ZoneListener implements Listener {
