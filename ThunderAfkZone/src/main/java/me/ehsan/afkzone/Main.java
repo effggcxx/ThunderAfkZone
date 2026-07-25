@@ -45,33 +45,6 @@ public class Main extends JavaPlugin {
 
 	private Map<String, Reward> rewards = new HashMap<>();
 
-	private static class Reward {
-		String name;
-		String description;
-		String executor; // console | itemedit | give
-		String command; // fallback console command (optional)
-		String itemName; // item identifier or award name
-		int amount;
-		int intervalSeconds;
-		int onceAfterSeconds;
-		int priority;
-		boolean enabled;
-
-		Reward(String name) {
-			this.name = name;
-		}
-	}
-
-	private static class NextRewardInfo {
-		final long remainingSeconds;
-		final long totalSeconds; // full period of the reward that is next due, used for boss bar progress
-
-		NextRewardInfo(long remainingSeconds, long totalSeconds) {
-			this.remainingSeconds = remainingSeconds;
-			this.totalSeconds = totalSeconds;
-		}
-	}
-
 	// runtime tracking (moved out of Reward)
 	private Map<UUID, BukkitTask> playerTasks = new ConcurrentHashMap<>();
 	private Map<UUID, Map<String, Integer>> playerProgress = new ConcurrentHashMap<>();
