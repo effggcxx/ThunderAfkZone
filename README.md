@@ -83,7 +83,6 @@ An empty / missing `rewards:` list = use every enabled global reward.
 ## Building
 
 ```bash
-cd ThunderAfkZone
 ./gradlew build
 ```
 
