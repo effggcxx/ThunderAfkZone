@@ -6,14 +6,11 @@ softdepend: [WorldEdit, ItemEdit]
 commands:
   afkzone:
     description: Manage AFK zones
-    usage: /afkzone create <name> | list | info <name> | remove <name> | reload | reward list|give <reward> [player]
+    usage: /afkzone <create|list|info|remove|reload|reward|zonereward>
     aliases: [taz, thunderafk]
 permissions:
   afkzone.create:
     description: Allows creating AFK zones with a WorldEdit selection
-    default: op
-  afkzone.reload:
-    description: Allows reloading the AfkZone configuration
     default: op
   afkzone.list:
     description: Allows listing AFK zones
@@ -24,9 +21,15 @@ permissions:
   afkzone.remove:
     description: Allows removing AFK zones
     default: op
+  afkzone.reload:
+    description: Allows reloading the AfkZone configuration
+    default: op
   afkzone.reward.list:
     description: Allows listing configured rewards
     default: op
   afkzone.reward.give:
     description: Allows manually giving a configured reward to a player
+    default: op
+  afkzone.zonereward:
+    description: Allows managing per-zone reward assignments
     default: op

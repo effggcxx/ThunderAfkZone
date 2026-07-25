@@ -15,7 +15,9 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 public class ZoneManager {
@@ -54,10 +56,6 @@ public class ZoneManager {
         return zonesConfig;
     }
 
-    /**
-     * Returns the zone name that contains the given location, or null if none.
-     * Linear scan is fine for a small number of zones; can be optimized later with a spatial index.
-     */
     public String findZoneForLocation(Location loc) {
         if (zonesConfig == null || !zonesConfig.isConfigurationSection("zones") || loc.getWorld() == null) {
             return null;
@@ -92,17 +90,60 @@ public class ZoneManager {
         return zonesConfig.getConfigurationSection("zones").getKeys(false);
     }
 
-    public void removeZone(String name) {
-        if (zonesConfig == null || !zonesConfig.isConfigurationSection("zones") || !zonesConfig.isSet("zones." + name)) {
-            return;
+    public boolean zoneExists(String name) {
+        return zonesConfig != null
+                && zonesConfig.isConfigurationSection("zones")
+                && zonesConfig.isSet("zones." + name);
+    }
+
+    /**
+     * Returns the list of reward names configured for this zone.
+     * Empty list means "use all enabled global rewards" (backward compatible).
+     */
+    public List<String> getZoneRewards(String zoneName) {
+        if (!zoneExists(zoneName)) return Collections.emptyList();
+        List<String> list = zonesConfig.getStringList("zones." + zoneName + ".rewards");
+        return list != null ? list : Collections.emptyList();
+    }
+
+    /**
+     * Sets the reward list for a zone. Pass an empty list to fall back to all global rewards.
+     */
+    public void setZoneRewards(String zoneName, List<String> rewardNames) {
+        if (!zoneExists(zoneName)) return;
+        if (rewardNames == null || rewardNames.isEmpty()) {
+            zonesConfig.set("zones." + zoneName + ".rewards", null);
+        } else {
+            zonesConfig.set("zones." + zoneName + ".rewards", new ArrayList<>(rewardNames));
         }
+        saveZonesFile();
+    }
+
+    public boolean addZoneReward(String zoneName, String rewardName) {
+        if (!zoneExists(zoneName)) return false;
+        List<String> current = new ArrayList<>(getZoneRewards(zoneName));
+        if (current.contains(rewardName)) return false;
+        current.add(rewardName);
+        setZoneRewards(zoneName, current);
+        return true;
+    }
+
+    public boolean removeZoneReward(String zoneName, String rewardName) {
+        if (!zoneExists(zoneName)) return false;
+        List<String> current = new ArrayList<>(getZoneRewards(zoneName));
+        if (!current.remove(rewardName)) return false;
+        setZoneRewards(zoneName, current);
+        return true;
+    }
+
+    public void removeZone(String name) {
+        if (!zoneExists(name)) return;
         zonesConfig.set("zones." + name, null);
         saveZonesFile();
     }
 
     /**
      * Creates a zone from the player's current WorldEdit selection using the official WorldEdit API.
-     * Requires WorldEdit (or FAWE) to be installed.
      */
     public boolean createZoneFromWorldEditSelection(Player player, String name) {
         if (plugin.getServer().getPluginManager().getPlugin("WorldEdit") == null) {
@@ -124,7 +165,6 @@ public class ZoneManager {
             BlockVector3 min = region.getMinimumPoint();
             BlockVector3 max = region.getMaximumPoint();
 
-            // WorldEdit regions can be in different worlds; prefer the selection's world
             World world = BukkitAdapter.adapt(region.getWorld());
             if (world == null) {
                 world = player.getWorld();
@@ -145,10 +185,12 @@ public class ZoneManager {
             zonesConfig.set(path + ".x2", x2);
             zonesConfig.set(path + ".y2", y2);
             zonesConfig.set(path + ".z2", z2);
+            // No rewards list → uses all global rewards by default
             saveZonesFile();
 
             player.sendMessage("§aAFK zone '" + name + "' created: " + world.getName()
                     + " (" + x1 + "," + y1 + "," + z1 + ") → (" + x2 + "," + y2 + "," + z2 + ")");
+            player.sendMessage("§7Tip: Use §e/afkzone zonereward add " + name + " <reward>§7 to restrict rewards for this zone.");
             return true;
 
         } catch (com.sk89q.worldedit.IncompleteRegionException e) {

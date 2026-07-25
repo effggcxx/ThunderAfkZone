@@ -202,15 +202,18 @@ public class RewardManager {
             Map<String, Integer> prog = playerProgress.computeIfAbsent(id, k -> new ConcurrentHashMap<>());
             Set<String> given = playerGivenOnce.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
 
-            // Increment progress for every enabled reward
-            for (Reward r : rewards.values()) {
+            // Rewards active for this zone (empty list = all global rewards)
+            List<Reward> zoneRewards = getRewardsForZone(zoneName);
+
+            // Increment progress only for rewards that apply to this zone
+            for (Reward r : zoneRewards) {
                 if (!r.enabled) continue;
                 prog.merge(r.name, 1, Integer::sum);
             }
 
             // Collect due rewards
             Set<Reward> due = new HashSet<>();
-            for (Reward r : rewards.values()) {
+            for (Reward r : zoneRewards) {
                 if (!r.enabled) continue;
                 int t = prog.getOrDefault(r.name, 0);
                 if (r.onceAfterSeconds > 0 && !given.contains(r.name) && t >= r.onceAfterSeconds) {
@@ -234,8 +237,8 @@ public class RewardManager {
                 }
             }
 
-            // Update timer display
-            NextRewardInfo info = getNearestReward(prog, given);
+            // Update timer display (only considering zone rewards)
+            NextRewardInfo info = getNearestReward(prog, given, zoneRewards);
             if (timerEnabled && info.getRemainingSeconds() > 0) {
                 sendTimer(player, info.getRemainingSeconds(), info.getTotalSeconds(), zoneName);
             }
@@ -428,10 +431,32 @@ public class RewardManager {
         }
     }
 
-    private NextRewardInfo getNearestReward(Map<String, Integer> prog, Set<String> given) {
+    /**
+     * Returns the rewards that apply to the given zone.
+     * If the zone has no explicit reward list (or an empty one), all enabled global rewards are used.
+     */
+    public List<Reward> getRewardsForZone(String zoneName) {
+        List<String> zoneRewardNames = zoneManager.getZoneRewards(zoneName);
+        if (zoneRewardNames == null || zoneRewardNames.isEmpty()) {
+            // Fallback: all enabled global rewards
+            return rewards.values().stream()
+                    .filter(r -> r.enabled)
+                    .collect(Collectors.toList());
+        }
+        List<Reward> result = new ArrayList<>();
+        for (String name : zoneRewardNames) {
+            Reward r = rewards.get(name);
+            if (r != null && r.enabled) {
+                result.add(r);
+            }
+        }
+        return result;
+    }
+
+    private NextRewardInfo getNearestReward(Map<String, Integer> prog, Set<String> given, List<Reward> zoneRewards) {
         long nearest = Long.MAX_VALUE;
         long total = 0;
-        for (Reward r : rewards.values()) {
+        for (Reward r : zoneRewards) {
             if (!r.enabled) continue;
             int current = prog.getOrDefault(r.name, 0);
             if (r.onceAfterSeconds > 0 && !given.contains(r.name)) {
@@ -464,3 +489,4 @@ public class RewardManager {
         }
     }
 }
+
