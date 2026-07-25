@@ -32,6 +32,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
 import net.kyori.adventure.util.Ticks;
+import net.kyori.adventure.bossbar.BossBar;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
@@ -41,7 +42,7 @@ import org.bukkit.Bukkit;
 public class Main extends JavaPlugin {
 	private File zonesFile;
 	private FileConfiguration zonesConfig;
-    
+
 	private Map<String, Reward> rewards = new HashMap<>();
 
 	private static class Reward {
@@ -54,9 +55,20 @@ public class Main extends JavaPlugin {
 		int intervalSeconds;
 		int onceAfterSeconds;
 		int priority;
+		boolean enabled;
 
 		Reward(String name) {
 			this.name = name;
+		}
+	}
+
+	private static class NextRewardInfo {
+		final long remainingSeconds;
+		final long totalSeconds; // full period of the reward that is next due, used for boss bar progress
+
+		NextRewardInfo(long remainingSeconds, long totalSeconds) {
+			this.remainingSeconds = remainingSeconds;
+			this.totalSeconds = totalSeconds;
 		}
 	}
 
@@ -65,6 +77,7 @@ public class Main extends JavaPlugin {
 	private Map<UUID, Map<String, Integer>> playerProgress = new ConcurrentHashMap<>();
 	private Map<UUID, Set<String>> playerGivenOnce = new ConcurrentHashMap<>();
 	private Map<UUID, String> playerZone = new ConcurrentHashMap<>();
+	private Map<UUID, BossBar> activeBossBars = new ConcurrentHashMap<>();
 	private String onMultiple = "all";
 	private Map<UUID, Long> lastActive = new ConcurrentHashMap<>();
 	private int afkThresholdSeconds = 60;
@@ -82,6 +95,12 @@ public class Main extends JavaPlugin {
 	private int timerTitleStay = 40;
 	private int timerTitleFadeOut = 5;
 	private final MiniMessage miniMessage = MiniMessage.miniMessage();
+
+	// Configurable, MiniMessage-styled player-facing messages (support <zone> / <reward> placeholders)
+	private String msgEnterZone = "<green>Entered AFK zone: <yellow><zone></yellow></green>";
+	private String msgExitZone = "<gray>You left AFK zone: <yellow><zone></yellow></gray>";
+	private String msgRewardReceived = "<gold>You received reward: <yellow><reward></yellow></gold>";
+	private String msgRewardFailed = "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>";
 
 	@Override
 	public void onEnable() {
@@ -112,6 +131,7 @@ public class Main extends JavaPlugin {
 			r.intervalSeconds = cfg.getInt(path + ".interval_seconds", 0);
 			r.onceAfterSeconds = cfg.getInt(path + ".once_after_seconds", 0);
 			r.priority = cfg.getInt(path + ".priority", 0);
+			r.enabled = cfg.getBoolean(path + ".enabled", true);
 			rewards.put(key, r);
 		}
 		getLogger().info("Loaded " + rewards.size() + " rewards");
@@ -132,6 +152,11 @@ public class Main extends JavaPlugin {
 		this.timerTitleFadeIn = getConfig().getInt("global.timer.title.fade_in", 5);
 		this.timerTitleStay = getConfig().getInt("global.timer.title.stay", 40);
 		this.timerTitleFadeOut = getConfig().getInt("global.timer.title.fade_out", 5);
+
+		this.msgEnterZone = getConfig().getString("global.messages.enter_zone", msgEnterZone);
+		this.msgExitZone = getConfig().getString("global.messages.exit_zone", msgExitZone);
+		this.msgRewardReceived = getConfig().getString("global.messages.reward_received", msgRewardReceived);
+		this.msgRewardFailed = getConfig().getString("global.messages.reward_failed", msgRewardFailed);
 	}
 
 	private Sound parseSound(String soundName, String configPath) {
@@ -154,8 +179,28 @@ public class Main extends JavaPlugin {
 		return seconds + "s";
 	}
 
-	private Component buildTimerComponent(long secondsRemaining) {
-		String text = timerTemplate.replace("<timer>", formatTime(secondsRemaining));
+	/**
+	 * Sends a MiniMessage-styled message to a player, substituting <zone> and/or
+	 * <reward> placeholders with plain values before parsing. Falls back to a
+	 * tag-stripped plain message if the template fails to parse.
+	 */
+	private void sendStyled(Player player, String template, String zoneName, String rewardName) {
+		if (template == null || template.isEmpty()) return;
+		String text = template;
+		if (zoneName != null) text = text.replace("<zone>", zoneName);
+		if (rewardName != null) text = text.replace("<reward>", rewardName);
+		try {
+			player.sendMessage(miniMessage.deserialize(text));
+		} catch (Exception ex) {
+			player.sendMessage(text.replaceAll("<[^>]+>", ""));
+		}
+	}
+
+	private Component buildTimerComponent(long secondsRemaining, String zoneName, String playerName) {
+		String text = timerTemplate
+				.replace("<timer>", formatTime(secondsRemaining))
+				.replace("<zone>", zoneName == null ? "" : zoneName)
+				.replace("<player>", playerName == null ? "" : playerName);
 		if ("mini".equalsIgnoreCase(timerSize)) {
 			text = "<gray><italic>" + text + "</italic></gray>";
 		} else if ("big".equalsIgnoreCase(timerSize)) {
@@ -168,9 +213,15 @@ public class Main extends JavaPlugin {
 		}
 	}
 
-	private void sendTimer(Player player, long secondsRemaining) {
+	private float clamp01(float v) {
+		if (v < 0f) return 0f;
+		if (v > 1f) return 1f;
+		return v;
+	}
+
+	private void sendTimer(Player player, long secondsRemaining, long totalSeconds, String zoneName) {
 		if (!timerEnabled) return;
-		Component component = buildTimerComponent(secondsRemaining);
+		Component component = buildTimerComponent(secondsRemaining, zoneName, player.getName());
 		switch (timerDisplay.toLowerCase(Locale.ROOT)) {
 			case "actionbar":
 				player.sendActionBar(component);
@@ -178,27 +229,50 @@ public class Main extends JavaPlugin {
 			case "chat":
 				player.sendMessage(component);
 				break;
+			case "bossbar": {
+				float progress = totalSeconds > 0
+						? clamp01((float) (totalSeconds - secondsRemaining) / (float) totalSeconds)
+						: 0f;
+				BossBar bar = activeBossBars.get(player.getUniqueId());
+				if (bar == null) {
+					bar = BossBar.bossBar(component, progress, BossBar.Color.YELLOW, BossBar.Overlay.PROGRESS);
+					activeBossBars.put(player.getUniqueId(), bar);
+					player.showBossBar(bar);
+				} else {
+					bar.name(component);
+					bar.progress(progress);
+				}
+				break;
+			}
 			default:
 				player.showTitle(Title.title(component, Component.empty(), Title.Times.times(Duration.ofMillis(timerTitleFadeIn * 50L), Duration.ofMillis(timerTitleStay * 50L), Duration.ofMillis(timerTitleFadeOut * 50L))));
 				break;
 		}
 	}
 
-	private long getNearestRewardSecondsRemaining(Map<String, Integer> prog, Set<String> given) {
+	private NextRewardInfo getNearestReward(Map<String, Integer> prog, Set<String> given) {
 		long nearest = Long.MAX_VALUE;
+		long total = 0;
 		for (Reward r : rewards.values()) {
+			if (!r.enabled) continue;
 			int current = prog.getOrDefault(r.name, 0);
 			if (r.onceAfterSeconds > 0 && !given.contains(r.name)) {
 				long remaining = r.onceAfterSeconds - current;
-				if (remaining >= 0 && remaining < nearest) nearest = remaining;
+				if (remaining >= 0 && remaining < nearest) {
+					nearest = remaining;
+					total = r.onceAfterSeconds;
+				}
 			}
 			if (r.intervalSeconds > 0) {
 				long remaining = r.intervalSeconds - (current % r.intervalSeconds);
 				if (remaining == r.intervalSeconds) remaining = r.intervalSeconds;
-				if (remaining >= 0 && remaining < nearest) nearest = remaining;
+				if (remaining >= 0 && remaining < nearest) {
+					nearest = remaining;
+					total = r.intervalSeconds;
+				}
 			}
 		}
-		return nearest == Long.MAX_VALUE ? 0 : nearest;
+		return nearest == Long.MAX_VALUE ? new NextRewardInfo(0, 0) : new NextRewardInfo(nearest, total);
 	}
 
 	private void giveRewardToPlayer(Reward r, Player player) {
@@ -208,10 +282,10 @@ public class Main extends JavaPlugin {
 			String consoleCmd = r.command.replace("{player}", player.getName()).replace("{award}", r.name);
 			boolean ok = dispatchAndCheck(consoleCmd, r.name);
 			if (ok) {
-				player.sendMessage("You received reward: " + r.name);
+				sendStyled(player, msgRewardReceived, null, r.name);
 				if (rewardSound != null) player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
 			} else {
-				player.sendMessage("Reward '" + r.name + "' could not be delivered. Please contact staff.");
+				sendStyled(player, msgRewardFailed, null, r.name);
 			}
 			return;
 		}
@@ -248,16 +322,16 @@ public class Main extends JavaPlugin {
 				}
 			}
 			if (ok) {
-				player.sendMessage("You received reward: " + r.name);
+				sendStyled(player, msgRewardReceived, null, r.name);
 				if (rewardSound != null) {
 					player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
 				}
 			} else {
-				player.sendMessage("Reward '" + r.name + "' could not be delivered. Please contact staff.");
+				sendStyled(player, msgRewardFailed, null, r.name);
 			}
 		} catch (Exception ex) {
 			getLogger().severe("Failed to give reward " + r.name + ": " + ex.getMessage());
-			player.sendMessage("Reward '" + r.name + "' could not be delivered. Please contact staff.");
+			sendStyled(player, msgRewardFailed, null, r.name);
 		}
 	}
 
@@ -303,7 +377,7 @@ public class Main extends JavaPlugin {
 	public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 		if (!command.getName().equalsIgnoreCase("afkzone")) return false;
 		if (args == null || args.length == 0) {
-			sender.sendMessage("Usage: /afkzone create <name> | list | remove <name>");
+			sender.sendMessage("Usage: /afkzone create <name> | list | info <name> | remove <name> | reload | reward list|give <reward> [player]");
 			return true;
 		}
 		String sub = args[0].toLowerCase();
@@ -327,17 +401,18 @@ public class Main extends JavaPlugin {
 				}
 				String act = args[1].toLowerCase();
 				if (act.equals("list")) {
-					if (rewards.isEmpty()) {
-						sender.sendMessage("No rewards configured.");
-						return true;
-					}
 					if (!sender.hasPermission("afkzone.reward.list")) {
 						sender.sendMessage("You don't have permission to list rewards.");
 						return true;
 					}
+					if (rewards.isEmpty()) {
+						sender.sendMessage("No rewards configured.");
+						return true;
+					}
 					sender.sendMessage("Rewards:");
 					for (Reward r : rewards.values()) {
-						sender.sendMessage("- " + r.name + " (priority=" + r.priority + ") - " + r.description);
+						String status = r.enabled ? "enabled" : "disabled";
+						sender.sendMessage("- " + r.name + " (" + status + ", priority=" + r.priority + ") - " + r.description);
 					}
 					return true;
 				} else if (act.equals("give")) {
@@ -397,6 +472,14 @@ public class Main extends JavaPlugin {
 				listZones(sender);
 				return true;
 			}
+			case "info": {
+				if (args.length < 2) {
+					sender.sendMessage("Usage: /afkzone info <name>");
+					return true;
+				}
+				showZoneInfo(sender, args[1]);
+				return true;
+			}
 			case "remove":
 			case "delete": {
 				if (args.length < 2) {
@@ -407,7 +490,7 @@ public class Main extends JavaPlugin {
 				return true;
 			}
 			default: {
-				sender.sendMessage("Usage: /afkzone create <name> | list | remove <name>");
+				sender.sendMessage("Usage: /afkzone create <name> | list | info <name> | remove <name>");
 				return true;
 			}
 		}
@@ -432,6 +515,42 @@ public class Main extends JavaPlugin {
 			int y2 = zonesConfig.getInt(path + ".y2", 0);
 			int z2 = zonesConfig.getInt(path + ".z2", 0);
 			sender.sendMessage(key + ": " + world + " (" + x1 + "," + y1 + "," + z1 + ") -> (" + x2 + "," + y2 + "," + z2 + ")");
+		}
+	}
+
+	/**
+	 * Shows a single zone's coordinates plus the rewards that apply there.
+	 * Rewards are global (not bound per-zone), so this lists every enabled
+	 * reward along with the overall enabled/disabled count.
+	 */
+	private void showZoneInfo(CommandSender sender, String name) {
+		if (zonesConfig == null || !zonesConfig.isConfigurationSection("zones") || !zonesConfig.isSet("zones." + name)) {
+			sender.sendMessage("Zone '" + name + "' does not exist.");
+			return;
+		}
+		String path = "zones." + name;
+		String world = zonesConfig.getString(path + ".world", "unknown");
+		int x1 = zonesConfig.getInt(path + ".x1", 0);
+		int y1 = zonesConfig.getInt(path + ".y1", 0);
+		int z1 = zonesConfig.getInt(path + ".z1", 0);
+		int x2 = zonesConfig.getInt(path + ".x2", 0);
+		int y2 = zonesConfig.getInt(path + ".y2", 0);
+		int z2 = zonesConfig.getInt(path + ".z2", 0);
+
+		sender.sendMessage("Zone '" + name + "':");
+		sender.sendMessage("  World: " + world);
+		sender.sendMessage("  Corners: (" + x1 + "," + y1 + "," + z1 + ") -> (" + x2 + "," + y2 + "," + z2 + ")");
+		sender.sendMessage("  Size: " + (Math.abs(x2 - x1) + 1) + " x " + (Math.abs(y2 - y1) + 1) + " x " + (Math.abs(z2 - z1) + 1));
+
+		if (rewards.isEmpty()) {
+			sender.sendMessage("  Rewards: none configured.");
+			return;
+		}
+		long enabledCount = rewards.values().stream().filter(r -> r.enabled).count();
+		sender.sendMessage("  Rewards (" + enabledCount + "/" + rewards.size() + " enabled, apply to all zones):");
+		for (Reward r : rewards.values()) {
+			String status = r.enabled ? "enabled" : "disabled";
+			sender.sendMessage("   - " + r.name + " (" + status + ", priority=" + r.priority + ")");
 		}
 	}
 
@@ -469,7 +588,7 @@ public class Main extends JavaPlugin {
 			String currentZone = findZoneForLocation(player.getLocation());
 			if (currentZone == null || !currentZone.equals(zoneName)) {
 				stopTrackingPlayer(id);
-				player.sendMessage("You left AFK zone: " + zoneName);
+				sendStyled(player, msgExitZone, zoneName, null);
 				return;
 			}
 			Map<String, Integer> prog = playerProgress.get(id);
@@ -481,12 +600,14 @@ public class Main extends JavaPlugin {
 				return; // not AFK yet
 			}
 			for (Reward r : rewards.values()) {
+				if (!r.enabled) continue;
 				prog.putIfAbsent(r.name, 0);
 				prog.put(r.name, prog.get(r.name) + 1);
 			}
 			// collect due rewards
 			Set<Reward> due = new HashSet<>();
 			for (Reward r : rewards.values()) {
+				if (!r.enabled) continue;
 				int t = prog.getOrDefault(r.name, 0);
 				if (r.onceAfterSeconds > 0 && !given.contains(r.name) && t >= r.onceAfterSeconds) due.add(r);
 				if (r.intervalSeconds > 0 && t > 0 && t % r.intervalSeconds == 0) due.add(r);
@@ -501,13 +622,13 @@ public class Main extends JavaPlugin {
 					if (r.onceAfterSeconds > 0) given.add(r.name);
 				}
 			}
-			long nextReward = getNearestRewardSecondsRemaining(prog, given);
-			if (timerEnabled && nextReward > 0) {
-				sendTimer(player, nextReward);
+			NextRewardInfo info = getNearestReward(prog, given);
+			if (timerEnabled && info.remainingSeconds > 0) {
+				sendTimer(player, info.remainingSeconds, info.totalSeconds, zoneName);
 			}
 		}, 20L, 20L);
 		playerTasks.put(id, task);
-		player.sendMessage("Entered AFK zone: " + zoneName);
+		sendStyled(player, msgEnterZone, zoneName, null);
 		if (enterSound != null) {
 			player.playSound(player.getLocation(), enterSound, soundVolume, soundPitch);
 		}
@@ -520,6 +641,10 @@ public class Main extends JavaPlugin {
 		playerGivenOnce.remove(id);
 		String zone = playerZone.remove(id);
 		Player player = Bukkit.getPlayer(id);
+		BossBar bar = activeBossBars.remove(id);
+		if (bar != null && player != null) {
+			player.hideBossBar(bar);
+		}
 		if (player != null && zone != null && exitSound != null) {
 			player.playSound(player.getLocation(), exitSound, soundVolume, soundPitch);
 		}
@@ -537,7 +662,7 @@ public class Main extends JavaPlugin {
 				startTrackingPlayer(p, zone);
 			} else if (zone == null && prev != null) {
 				stopTrackingPlayer(id);
-				p.sendMessage("You left AFK zone: " + prev);
+				sendStyled(p, msgExitZone, prev, null);
 			}
 		}
 
@@ -683,4 +808,3 @@ public class Main extends JavaPlugin {
 		}
 	}
 }
-

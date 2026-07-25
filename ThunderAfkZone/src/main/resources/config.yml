@@ -27,21 +27,33 @@ global:
       stay: 40
       fade_out: 5
 
-  # Supported placeholders: <timer>
-  # Supported display values: title, actionbar, chat
-  # Supported size values: big, mini
+  # Supported placeholders: <timer>, <zone>, <player>
+  # Supported display values: title, actionbar, chat, bossbar
+  #   - bossbar shows a persistent progress bar that fills up as the next
+  #     reward approaches, instead of interrupting the screen like a title.
+  # Supported size values: big, mini (only affects title/actionbar/chat)
   # Default size is big.
   # Use MiniMessage tags and hex colors inside the template.
   # Invalid sound names are now warned during config reload.
 
+  # Player-facing messages. MiniMessage tags supported. <zone> and <reward>
+  # placeholders are substituted with the zone/reward name before parsing.
+  messages:
+    enter_zone: "<green>Entered AFK zone: <yellow><zone></yellow></green>"
+    exit_zone: "<gray>You left AFK zone: <yellow><zone></yellow></gray>"
+    reward_received: "<gold>You received reward: <yellow><reward></yellow></gold>"
+    reward_failed: "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>"
+
 # Define as many rewards as you like under `rewards`.
-# New reward schema fields:
+# Reward schema fields:
 # - executor: "itemedit" | "give" | "console" (itemedit uses ItemEdit `/si` syntax)
 # - item: the item name or award name (for ItemEdit this is the award identifier)
 # - amount: number of items to give
 # - interval_seconds: repeat every X seconds (set 0 to disable)
 # - once_after_seconds: give once after X seconds (set 0 to disable)
 # - priority: integer priority used when `global.on_multiple: "highest"`
+# - enabled: true/false - set to false to pause a reward without deleting its
+#   config (handy for seasonal/event rewards). Defaults to true if omitted.
 # Example rewards:
 rewards:
   welcome_diamond:
@@ -52,6 +64,7 @@ rewards:
     interval_seconds: 0
     once_after_seconds: 0
     priority: 5
+    enabled: true
 
   starter_kit:
     description: "Give starter items via ItemEdit"
@@ -61,6 +74,7 @@ rewards:
     interval_seconds: 0
     once_after_seconds: 0
     priority: 1
+    enabled: true
 
 # Notes:
 # - Use `executor: itemedit` to dispatch `si give <player> <item> <amount>`.
