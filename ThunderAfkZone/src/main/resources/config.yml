@@ -1,0 +1,43 @@
+# AfkZone plugin configuration - rewards schema
+global:
+	# When multiple rewards are eligible at the same moment, choose behavior:
+	# "all" - give all eligible rewards
+	# "highest" - give only the reward with the highest priority
+	on_multiple: "all"
+	# Seconds of inactivity before a player is considered AFK for rewards
+	afk_threshold_seconds: 60
+
+# Define as many rewards as you like under `rewards`.
+# New reward schema fields:
+# - executor: "itemedit" | "give" | "console" (itemedit uses ItemEdit `/si` syntax)
+# - item: the item name or award name (for ItemEdit this is the award identifier)
+# - amount: number of items to give
+# - interval_seconds: repeat every X seconds (set 0 to disable)
+# - once_after_seconds: give once after X seconds (set 0 to disable)
+# - priority: integer priority used when `global.on_multiple: "highest"`
+# Example rewards:
+rewards:
+	welcome_diamond:
+		description: "Give a diamond to the player"
+		executor: "give" # vanilla give -> /give <player> <item> <amount>
+		item: "diamond"
+		amount: 1
+		interval_seconds: 0
+		once_after_seconds: 0
+		priority: 5
+
+	starter_kit:
+		description: "Give starter items via ItemEdit"
+		executor: "itemedit" # ItemEdit uses `/si give <player> <item> <amount>`
+		item: "starter_item"
+		amount: 1
+		interval_seconds: 0
+		once_after_seconds: 0
+		priority: 1
+
+# Notes:
+# - Use `executor: itemedit` to dispatch `si give <player> <item> <amount>`.
+# - Use `executor: give` to dispatch `give <player> <item> <amount>`.
+# - Use `executor: console` to run an arbitrary console command; in that case
+#   set `command: "<console command with {player} placeholder>"` instead of
+#   `item`/`amount`.
