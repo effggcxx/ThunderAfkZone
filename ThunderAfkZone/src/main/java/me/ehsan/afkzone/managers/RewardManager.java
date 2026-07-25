@@ -3,10 +3,10 @@ package me.ehsan.afkzone.managers;
 import me.ehsan.afkzone.Main;
 import me.ehsan.afkzone.models.NextRewardInfo;
 import me.ehsan.afkzone.models.Reward;
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
-import net.kyori.adventure.bossbar.BossBar;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -18,20 +18,26 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+/**
+ * Manages rewards and player tracking with a single global scheduler
+ * instead of one BukkitTask per player.
+ */
 public class RewardManager {
 
     private final Main plugin;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
+    private final ZoneManager zoneManager;
 
     private Map<String, Reward> rewards = new HashMap<>();
 
-    // Runtime tracking
-    private Map<UUID, BukkitTask> playerTasks = new ConcurrentHashMap<>();
-    private Map<UUID, Map<String, Integer>> playerProgress = new ConcurrentHashMap<>();
-    private Map<UUID, Set<String>> playerGivenOnce = new ConcurrentHashMap<>();
-    private Map<UUID, String> playerZone = new ConcurrentHashMap<>();
-    private Map<UUID, BossBar> activeBossBars = new ConcurrentHashMap<>();
-    private Map<UUID, Long> lastActive = new ConcurrentHashMap<>();
+    // Runtime tracking (thread-safe)
+    private final Map<UUID, Map<String, Integer>> playerProgress = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<String>> playerGivenOnce = new ConcurrentHashMap<>();
+    private final Map<UUID, String> playerZone = new ConcurrentHashMap<>();
+    private final Map<UUID, BossBar> activeBossBars = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastActive = new ConcurrentHashMap<>();
+
+    private BukkitTask globalTask;
 
     private String onMultiple = "all";
     private int afkThresholdSeconds = 60;
@@ -49,13 +55,10 @@ public class RewardManager {
     private int timerTitleStay = 40;
     private int timerTitleFadeOut = 5;
 
-    // Messages
     private String msgEnterZone = "<green>Entered AFK zone: <yellow><zone></yellow></green>";
     private String msgExitZone = "<gray>You left AFK zone: <yellow><zone></yellow></gray>";
     private String msgRewardReceived = "<gold>You received reward: <yellow><reward></yellow></gold>";
     private String msgRewardFailed = "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>";
-
-    private final ZoneManager zoneManager;
 
     public RewardManager(Main plugin, ZoneManager zoneManager) {
         this.plugin = plugin;
@@ -131,7 +134,226 @@ public class RewardManager {
         return playerZone.containsKey(id);
     }
 
-    // --- Timer / Display utilities ---
+    // -------------------------------------------------------------------------
+    // Global scheduler
+    // -------------------------------------------------------------------------
+
+    /**
+     * Starts the single global task that ticks every second and processes
+     * all currently tracked players. Safe to call multiple times.
+     */
+    public void startGlobalScheduler() {
+        if (globalTask != null && !globalTask.isCancelled()) {
+            return;
+        }
+        globalTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickAllPlayers, 20L, 20L);
+        plugin.getLogger().info("Global AFK reward scheduler started");
+    }
+
+    public void stopGlobalScheduler() {
+        if (globalTask != null) {
+            globalTask.cancel();
+            globalTask = null;
+        }
+        // Clean up any remaining boss bars
+        for (Map.Entry<UUID, BossBar> entry : activeBossBars.entrySet()) {
+            Player p = Bukkit.getPlayer(entry.getKey());
+            if (p != null) {
+                p.hideBossBar(entry.getValue());
+            }
+        }
+        activeBossBars.clear();
+        playerProgress.clear();
+        playerGivenOnce.clear();
+        playerZone.clear();
+        lastActive.clear();
+    }
+
+    private void tickAllPlayers() {
+        if (playerZone.isEmpty()) return;
+
+        // Snapshot to avoid ConcurrentModificationException while iterating
+        List<UUID> tracked = new ArrayList<>(playerZone.keySet());
+
+        for (UUID id : tracked) {
+            Player player = Bukkit.getPlayer(id);
+            if (player == null || !player.isOnline()) {
+                stopTrackingPlayer(id);
+                continue;
+            }
+
+            String zoneName = playerZone.get(id);
+            if (zoneName == null) continue;
+
+            // Verify player is still inside the zone
+            String currentZone = zoneManager.findZoneForLocation(player.getLocation());
+            if (currentZone == null || !currentZone.equals(zoneName)) {
+                stopTrackingPlayer(id);
+                sendStyled(player, msgExitZone, zoneName, null);
+                continue;
+            }
+
+            // Only count time if the player is considered AFK
+            long last = lastActive.getOrDefault(id, System.currentTimeMillis());
+            if ((System.currentTimeMillis() - last) < (afkThresholdSeconds * 1000L)) {
+                continue;
+            }
+
+            Map<String, Integer> prog = playerProgress.computeIfAbsent(id, k -> new ConcurrentHashMap<>());
+            Set<String> given = playerGivenOnce.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
+
+            // Increment progress for every enabled reward
+            for (Reward r : rewards.values()) {
+                if (!r.enabled) continue;
+                prog.merge(r.name, 1, Integer::sum);
+            }
+
+            // Collect due rewards
+            Set<Reward> due = new HashSet<>();
+            for (Reward r : rewards.values()) {
+                if (!r.enabled) continue;
+                int t = prog.getOrDefault(r.name, 0);
+                if (r.onceAfterSeconds > 0 && !given.contains(r.name) && t >= r.onceAfterSeconds) {
+                    due.add(r);
+                }
+                if (r.intervalSeconds > 0 && t > 0 && t % r.intervalSeconds == 0) {
+                    due.add(r);
+                }
+            }
+
+            if (!due.isEmpty()) {
+                if ("highest".equalsIgnoreCase(onMultiple)) {
+                    int max = due.stream().mapToInt(x -> x.priority).max().orElse(Integer.MIN_VALUE);
+                    due = due.stream().filter(x -> x.priority == max).collect(Collectors.toSet());
+                }
+                for (Reward r : due) {
+                    giveRewardToPlayer(r, player);
+                    if (r.onceAfterSeconds > 0) {
+                        given.add(r.name);
+                    }
+                }
+            }
+
+            // Update timer display
+            NextRewardInfo info = getNearestReward(prog, given);
+            if (timerEnabled && info.getRemainingSeconds() > 0) {
+                sendTimer(player, info.getRemainingSeconds(), info.getTotalSeconds(), zoneName);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Player enter / leave
+    // -------------------------------------------------------------------------
+
+    public void startTrackingPlayer(Player player, String zoneName) {
+        UUID id = player.getUniqueId();
+
+        // If already tracking a different zone, clean up first
+        if (playerZone.containsKey(id)) {
+            stopTrackingPlayer(id);
+        }
+
+        playerZone.put(id, zoneName);
+        playerProgress.put(id, new ConcurrentHashMap<>());
+        playerGivenOnce.put(id, ConcurrentHashMap.newKeySet());
+        // Treat join as active so the AFK threshold has to pass before rewards start
+        lastActive.put(id, System.currentTimeMillis());
+
+        sendStyled(player, msgEnterZone, zoneName, null);
+        if (enterSound != null) {
+            player.playSound(player.getLocation(), enterSound, soundVolume, soundPitch);
+        }
+    }
+
+    public void stopTrackingPlayer(UUID id) {
+        playerProgress.remove(id);
+        playerGivenOnce.remove(id);
+        String zone = playerZone.remove(id);
+        lastActive.remove(id);
+
+        BossBar bar = activeBossBars.remove(id);
+        Player player = Bukkit.getPlayer(id);
+        if (bar != null && player != null) {
+            player.hideBossBar(bar);
+        }
+        if (player != null && zone != null && exitSound != null) {
+            player.playSound(player.getLocation(), exitSound, soundVolume, soundPitch);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Reward delivery
+    // -------------------------------------------------------------------------
+
+    public void giveRewardToPlayer(Reward r, Player player) {
+        if (r == null || player == null) return;
+
+        if ((r.executor == null || r.executor.equalsIgnoreCase("console")) && r.command != null && !r.command.isEmpty()) {
+            String consoleCmd = r.command.replace("{player}", player.getName()).replace("{award}", r.name);
+            boolean ok = dispatchAndCheck(consoleCmd, r.name);
+            if (ok) {
+                sendStyled(player, msgRewardReceived, null, r.name);
+                if (rewardSound != null) player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
+            } else {
+                sendStyled(player, msgRewardFailed, null, r.name);
+            }
+            return;
+        }
+
+        try {
+            String ex = r.executor == null ? "console" : r.executor.toLowerCase(Locale.ROOT);
+            boolean ok = true;
+            switch (ex) {
+                case "itemedit" -> {
+                    String dispatch = "si give " + player.getName() + " " + r.itemName + " " + r.amount;
+                    ok = dispatchAndCheck(dispatch, r.name);
+                }
+                case "item", "itemadder" -> {
+                    String dispatch = "itemadder give " + player.getName() + " " + r.itemName + " " + r.amount;
+                    ok = dispatchAndCheck(dispatch, r.name);
+                }
+                case "vanilla", "give" -> {
+                    String giveCmd = "give " + player.getName() + " " + r.itemName + " " + r.amount;
+                    ok = dispatchAndCheck(giveCmd, r.name);
+                }
+                default -> {
+                    if (r.command != null && !r.command.isEmpty()) {
+                        String fallback = r.command.replace("{player}", player.getName()).replace("{award}", r.name);
+                        ok = dispatchAndCheck(fallback, r.name);
+                    }
+                }
+            }
+            if (ok) {
+                sendStyled(player, msgRewardReceived, null, r.name);
+                if (rewardSound != null) {
+                    player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
+                }
+            } else {
+                sendStyled(player, msgRewardFailed, null, r.name);
+            }
+        } catch (Exception ex) {
+            plugin.getLogger().severe("Failed to give reward " + r.name + ": " + ex.getMessage());
+            sendStyled(player, msgRewardFailed, null, r.name);
+        }
+    }
+
+    private boolean dispatchAndCheck(String command, String rewardName) {
+        try {
+            boolean result = plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), command);
+            if (!result) {
+                plugin.getLogger().warning("Command for reward '" + rewardName + "' returned failure: /" + command);
+            }
+            return result;
+        } catch (Exception ex) {
+            plugin.getLogger().severe("Exception dispatching command for reward '" + rewardName + "': /" + command + " - " + ex.getMessage());
+            return false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Timer / display helpers
+    // -------------------------------------------------------------------------
 
     private String formatTime(long seconds) {
         if (seconds <= 0) return "0s";
@@ -182,13 +404,9 @@ public class RewardManager {
         if (!timerEnabled) return;
         Component component = buildTimerComponent(secondsRemaining, zoneName, player.getName());
         switch (timerDisplay.toLowerCase(Locale.ROOT)) {
-            case "actionbar":
-                player.sendActionBar(component);
-                break;
-            case "chat":
-                player.sendMessage(component);
-                break;
-            case "bossbar": {
+            case "actionbar" -> player.sendActionBar(component);
+            case "chat" -> player.sendMessage(component);
+            case "bossbar" -> {
                 float progress = totalSeconds > 0
                         ? clamp01((float) (totalSeconds - secondsRemaining) / (float) totalSeconds)
                         : 0f;
@@ -201,15 +419,12 @@ public class RewardManager {
                     bar.name(component);
                     bar.progress(progress);
                 }
-                break;
             }
-            default:
-                player.showTitle(Title.title(component, Component.empty(),
-                        Title.Times.times(
-                                Duration.ofMillis(timerTitleFadeIn * 50L),
-                                Duration.ofMillis(timerTitleStay * 50L),
-                                Duration.ofMillis(timerTitleFadeOut * 50L))));
-                break;
+            default -> player.showTitle(Title.title(component, Component.empty(),
+                    Title.Times.times(
+                            Duration.ofMillis(timerTitleFadeIn * 50L),
+                            Duration.ofMillis(timerTitleStay * 50L),
+                            Duration.ofMillis(timerTitleFadeOut * 50L))));
         }
     }
 
@@ -236,151 +451,6 @@ public class RewardManager {
             }
         }
         return nearest == Long.MAX_VALUE ? new NextRewardInfo(0, 0) : new NextRewardInfo(nearest, total);
-    }
-
-    public void giveRewardToPlayer(Reward r, Player player) {
-        if (r == null || player == null) return;
-        if ((r.executor == null || r.executor.equalsIgnoreCase("console")) && r.command != null && !r.command.isEmpty()) {
-            String consoleCmd = r.command.replace("{player}", player.getName()).replace("{award}", r.name);
-            boolean ok = dispatchAndCheck(consoleCmd, r.name);
-            if (ok) {
-                sendStyled(player, msgRewardReceived, null, r.name);
-                if (rewardSound != null) player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
-            } else {
-                sendStyled(player, msgRewardFailed, null, r.name);
-            }
-            return;
-        }
-        try {
-            String ex = r.executor == null ? "console" : r.executor.toLowerCase();
-            boolean ok = true;
-            switch (ex) {
-                case "itemedit": {
-                    String dispatch = "si give " + player.getName() + " " + r.itemName + " " + r.amount;
-                    ok = dispatchAndCheck(dispatch, r.name);
-                    break;
-                }
-                case "item":
-                case "itemadder": {
-                    String dispatch = "itemadder give " + player.getName() + " " + r.itemName + " " + r.amount;
-                    ok = dispatchAndCheck(dispatch, r.name);
-                    break;
-                }
-                case "vanilla":
-                case "give": {
-                    String giveCmd = "give " + player.getName() + " " + r.itemName + " " + r.amount;
-                    ok = dispatchAndCheck(giveCmd, r.name);
-                    break;
-                }
-                default: {
-                    if (r.command != null && !r.command.isEmpty()) {
-                        String fallback = r.command.replace("{player}", player.getName()).replace("{award}", r.name);
-                        ok = dispatchAndCheck(fallback, r.name);
-                    }
-                    break;
-                }
-            }
-            if (ok) {
-                sendStyled(player, msgRewardReceived, null, r.name);
-                if (rewardSound != null) {
-                    player.playSound(player.getLocation(), rewardSound, soundVolume, soundPitch);
-                }
-            } else {
-                sendStyled(player, msgRewardFailed, null, r.name);
-            }
-        } catch (Exception ex) {
-            plugin.getLogger().severe("Failed to give reward " + r.name + ": " + ex.getMessage());
-            sendStyled(player, msgRewardFailed, null, r.name);
-        }
-    }
-
-    private boolean dispatchAndCheck(String command, String rewardName) {
-        try {
-            boolean result = plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), command);
-            if (!result) {
-                plugin.getLogger().warning("Command for reward '" + rewardName + "' returned failure: /" + command);
-            }
-            return result;
-        } catch (Exception ex) {
-            plugin.getLogger().severe("Exception dispatching command for reward '" + rewardName + "': /" + command + " - " + ex.getMessage());
-            return false;
-        }
-    }
-
-    // --- Player Tracking ---
-
-    public void startTrackingPlayer(final Player player, final String zoneName) {
-        UUID id = player.getUniqueId();
-        stopTrackingPlayer(id);
-        playerZone.put(id, zoneName);
-        playerProgress.put(id, new ConcurrentHashMap<>());
-        playerGivenOnce.put(id, ConcurrentHashMap.newKeySet());
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (!player.isOnline()) {
-                stopTrackingPlayer(id);
-                return;
-            }
-            String currentZone = zoneManager.findZoneForLocation(player.getLocation());
-            if (currentZone == null || !currentZone.equals(zoneName)) {
-                stopTrackingPlayer(id);
-                sendStyled(player, msgExitZone, zoneName, null);
-                return;
-            }
-            Map<String, Integer> prog = playerProgress.get(id);
-            Set<String> given = playerGivenOnce.get(id);
-            if (prog == null) return;
-            long last = lastActive.getOrDefault(id, System.currentTimeMillis());
-            if ((System.currentTimeMillis() - last) < (afkThresholdSeconds * 1000L)) {
-                return;
-            }
-            for (Reward r : rewards.values()) {
-                if (!r.enabled) continue;
-                prog.putIfAbsent(r.name, 0);
-                prog.put(r.name, prog.get(r.name) + 1);
-            }
-            Set<Reward> due = new HashSet<>();
-            for (Reward r : rewards.values()) {
-                if (!r.enabled) continue;
-                int t = prog.getOrDefault(r.name, 0);
-                if (r.onceAfterSeconds > 0 && !given.contains(r.name) && t >= r.onceAfterSeconds) due.add(r);
-                if (r.intervalSeconds > 0 && t > 0 && t % r.intervalSeconds == 0) due.add(r);
-            }
-            if (!due.isEmpty()) {
-                if ("highest".equalsIgnoreCase(onMultiple)) {
-                    int max = due.stream().mapToInt(x -> x.priority).max().orElse(Integer.MIN_VALUE);
-                    due = due.stream().filter(x -> x.priority == max).collect(Collectors.toSet());
-                }
-                for (Reward r : due) {
-                    giveRewardToPlayer(r, player);
-                    if (r.onceAfterSeconds > 0) given.add(r.name);
-                }
-            }
-            NextRewardInfo info = getNearestReward(prog, given);
-            if (timerEnabled && info.getRemainingSeconds() > 0) {
-                sendTimer(player, info.getRemainingSeconds(), info.getTotalSeconds(), zoneName);
-            }
-        }, 20L, 20L);
-        playerTasks.put(id, task);
-        sendStyled(player, msgEnterZone, zoneName, null);
-        if (enterSound != null) {
-            player.playSound(player.getLocation(), enterSound, soundVolume, soundPitch);
-        }
-    }
-
-    public void stopTrackingPlayer(UUID id) {
-        BukkitTask t = playerTasks.remove(id);
-        if (t != null) t.cancel();
-        playerProgress.remove(id);
-        playerGivenOnce.remove(id);
-        String zone = playerZone.remove(id);
-        Player player = Bukkit.getPlayer(id);
-        BossBar bar = activeBossBars.remove(id);
-        if (bar != null && player != null) {
-            player.hideBossBar(bar);
-        }
-        if (player != null && zone != null && exitSound != null) {
-            player.playSound(player.getLocation(), exitSound, soundVolume, soundPitch);
-        }
     }
 
     public void sendEnterMessage(Player player, String zoneName) {

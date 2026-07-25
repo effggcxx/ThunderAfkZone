@@ -16,29 +16,31 @@ public class Main extends JavaPlugin {
     public void onEnable() {
         saveDefaultConfig();
 
-        // Initialize managers
         this.zoneManager = new ZoneManager(this);
         this.rewardManager = new RewardManager(this, zoneManager);
 
-        // Load configuration
         rewardManager.loadRewards();
         rewardManager.loadGlobalConfig();
 
-        // Register listeners
+        // Single global scheduler that ticks all tracked players every second
+        rewardManager.startGlobalScheduler();
+
         getServer().getPluginManager().registerEvents(new ZoneListener(this, zoneManager, rewardManager), this);
         getServer().getPluginManager().registerEvents(new ActivityListener(rewardManager), this);
 
-        // Register command
         if (getCommand("afkzone") != null) {
             getCommand("afkzone").setExecutor(new AfkZoneCommand(this, zoneManager, rewardManager));
         }
 
-        getLogger().info("AfkZone enabled");
+        getLogger().info("ThunderAfkZone enabled");
     }
 
     @Override
     public void onDisable() {
-        getLogger().info("AfkZone disabled");
+        if (rewardManager != null) {
+            rewardManager.stopGlobalScheduler();
+        }
+        getLogger().info("ThunderAfkZone disabled");
     }
 
     public ZoneManager getZoneManager() {

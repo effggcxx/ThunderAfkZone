@@ -31,7 +31,7 @@ public class AfkZoneCommand implements CommandExecutor {
         }
         String sub = args[0].toLowerCase();
         switch (sub) {
-            case "reload": {
+            case "reload" -> {
                 if (!sender.hasPermission("afkzone.reload")) {
                     sender.sendMessage("You don't have permission to reload AfkZone.");
                     return true;
@@ -43,11 +43,11 @@ public class AfkZoneCommand implements CommandExecutor {
                 sender.sendMessage("AfkZone configuration reloaded.");
                 return true;
             }
-            case "reward": {
+            case "reward" -> {
                 return handleRewardCommand(sender, args);
             }
-            case "create": {
-                if (!(sender instanceof Player)) {
+            case "create" -> {
+                if (!(sender instanceof Player player)) {
                     sender.sendMessage("Only players can create zones");
                     return true;
                 }
@@ -59,16 +59,22 @@ public class AfkZoneCommand implements CommandExecutor {
                     sender.sendMessage("Usage: /afkzone create <name>");
                     return true;
                 }
-                Player player = (Player) sender;
-                String name = args[1];
-                zoneManager.createZoneFromWorldEditSelection(player, name);
+                zoneManager.createZoneFromWorldEditSelection(player, args[1]);
                 return true;
             }
-            case "list": {
+            case "list" -> {
+                if (!sender.hasPermission("afkzone.list")) {
+                    sender.sendMessage("You don't have permission to list zones.");
+                    return true;
+                }
                 listZones(sender);
                 return true;
             }
-            case "info": {
+            case "info" -> {
+                if (!sender.hasPermission("afkzone.info")) {
+                    sender.sendMessage("You don't have permission to view zone info.");
+                    return true;
+                }
                 if (args.length < 2) {
                     sender.sendMessage("Usage: /afkzone info <name>");
                     return true;
@@ -76,8 +82,11 @@ public class AfkZoneCommand implements CommandExecutor {
                 showZoneInfo(sender, args[1]);
                 return true;
             }
-            case "remove":
-            case "delete": {
+            case "remove", "delete" -> {
+                if (!sender.hasPermission("afkzone.remove")) {
+                    sender.sendMessage("You don't have permission to remove zones.");
+                    return true;
+                }
                 if (args.length < 2) {
                     sender.sendMessage("Usage: /afkzone remove <name>");
                     return true;
@@ -85,8 +94,8 @@ public class AfkZoneCommand implements CommandExecutor {
                 removeZone(sender, args[1]);
                 return true;
             }
-            default: {
-                sender.sendMessage("Usage: /afkzone create <name> | list | info <name> | remove <name>");
+            default -> {
+                sender.sendMessage("Usage: /afkzone create <name> | list | info <name> | remove <name> | reload | reward list|give <reward> [player]");
                 return true;
             }
         }
@@ -118,6 +127,10 @@ public class AfkZoneCommand implements CommandExecutor {
                 sender.sendMessage("Usage: /afkzone reward give <reward> [player]");
                 return true;
             }
+            if (!sender.hasPermission("afkzone.reward.give")) {
+                sender.sendMessage("You don't have permission to give rewards.");
+                return true;
+            }
             String rewardName = args[2];
             Reward r = rewardManager.getRewards().get(rewardName);
             if (r == null) {
@@ -126,18 +139,13 @@ public class AfkZoneCommand implements CommandExecutor {
             }
             Player target = null;
             if (args.length >= 4) {
-                String p = args[3];
-                target = plugin.getServer().getPlayerExact(p);
+                target = plugin.getServer().getPlayerExact(args[3]);
                 if (target == null) {
-                    sender.sendMessage("Player not found: " + p);
+                    sender.sendMessage("Player not found: " + args[3]);
                     return true;
                 }
-            } else {
-                if (sender instanceof Player) target = (Player) sender;
-            }
-            if (!sender.hasPermission("afkzone.reward.give")) {
-                sender.sendMessage("You don't have permission to give rewards.");
-                return true;
+            } else if (sender instanceof Player p) {
+                target = p;
             }
             if (target == null) {
                 sender.sendMessage("No target player specified and console cannot be target.");
@@ -151,11 +159,7 @@ public class AfkZoneCommand implements CommandExecutor {
 
     private void listZones(CommandSender sender) {
         FileConfiguration zonesConfig = zoneManager.getZonesConfig();
-        if (zonesConfig == null) {
-            sender.sendMessage("No zones configured.");
-            return;
-        }
-        if (!zonesConfig.isConfigurationSection("zones")) {
+        if (zonesConfig == null || !zonesConfig.isConfigurationSection("zones")) {
             sender.sendMessage("No zones configured.");
             return;
         }
@@ -168,7 +172,7 @@ public class AfkZoneCommand implements CommandExecutor {
             int x2 = zonesConfig.getInt(path + ".x2", 0);
             int y2 = zonesConfig.getInt(path + ".y2", 0);
             int z2 = zonesConfig.getInt(path + ".z2", 0);
-            sender.sendMessage(key + ": " + world + " (" + x1 + "," + y1 + "," + z1 + ") -> (" + x2 + "," + y2 + "," + z2 + ")");
+            sender.sendMessage(key + ": " + world + " (" + x1 + "," + y1 + "," + z1 + ") → (" + x2 + "," + y2 + "," + z2 + ")");
         }
     }
 
@@ -189,7 +193,7 @@ public class AfkZoneCommand implements CommandExecutor {
 
         sender.sendMessage("Zone '" + name + "':");
         sender.sendMessage("  World: " + world);
-        sender.sendMessage("  Corners: (" + x1 + "," + y1 + "," + z1 + ") -> (" + x2 + "," + y2 + "," + z2 + ")");
+        sender.sendMessage("  Corners: (" + x1 + "," + y1 + "," + z1 + ") → (" + x2 + "," + y2 + "," + z2 + ")");
         sender.sendMessage("  Size: " + (Math.abs(x2 - x1) + 1) + " x " + (Math.abs(y2 - y1) + 1) + " x " + (Math.abs(z2 - z1) + 1));
 
         if (rewardManager.getRewards().isEmpty()) {

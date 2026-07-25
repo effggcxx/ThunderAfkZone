@@ -13,21 +13,22 @@ import java.util.UUID;
 
 public class ZoneListener implements Listener {
 
-    private final Main plugin;
     private final ZoneManager zoneManager;
     private final RewardManager rewardManager;
 
     public ZoneListener(Main plugin, ZoneManager zoneManager, RewardManager rewardManager) {
-        this.plugin = plugin;
         this.zoneManager = zoneManager;
         this.rewardManager = rewardManager;
     }
 
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent e) {
-        if (e.getFrom().getBlockX() == e.getTo().getBlockX() &&
-                e.getFrom().getBlockY() == e.getTo().getBlockY() &&
-                e.getFrom().getBlockZ() == e.getTo().getBlockZ()) return;
+        // Ignore head rotation / small non-block moves
+        if (e.getFrom().getBlockX() == e.getTo().getBlockX()
+                && e.getFrom().getBlockY() == e.getTo().getBlockY()
+                && e.getFrom().getBlockZ() == e.getTo().getBlockZ()) {
+            return;
+        }
 
         Player p = e.getPlayer();
         String zone = zoneManager.findZoneForLocation(p.getLocation());
@@ -35,8 +36,10 @@ public class ZoneListener implements Listener {
         String prev = rewardManager.getPlayerZone(id);
 
         if (zone != null && (prev == null || !prev.equals(zone))) {
+            // Entered a (new) zone
             rewardManager.startTrackingPlayer(p, zone);
         } else if (zone == null && prev != null) {
+            // Left the zone
             rewardManager.stopTrackingPlayer(id);
             rewardManager.sendExitMessage(p, prev);
         }

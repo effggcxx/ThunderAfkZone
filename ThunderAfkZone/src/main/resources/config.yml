@@ -1,18 +1,18 @@
-# AfkZone plugin configuration - rewards schema
+# ThunderAfkZone configuration
+
 global:
-  # When multiple rewards are eligible at the same moment, choose behavior:
-  # "all" - give all eligible rewards
-  # "highest" - give only the reward with the highest priority
+  # When multiple rewards are eligible at the same moment:
+  # "all"     - give every eligible reward
+  # "highest" - give only the reward(s) with the highest priority
   on_multiple: "all"
+
   # Seconds of inactivity before a player is considered AFK for rewards
   afk_threshold_seconds: 60
-  # Sound played when a player enters a zone
+
+  # Sounds (Bukkit Sound enum names). Invalid names are warned on reload.
   enter_sound: "ENTITY_PLAYER_LEVELUP"
-  # Sound played when a player exits a zone
   exit_sound: "ENTITY_ITEM_BREAK"
-  # Sound played when a player receives a reward
   reward_sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
-  # Sound volume and pitch for all zone sounds
   sound_volume: 1.0
   sound_pitch: 1.0
 
@@ -20,45 +20,38 @@ global:
   timer:
     enabled: true
     template: "<yellow><bold>Next reward in <timer></bold></yellow>"
+    # title | actionbar | chat | bossbar
     display: "title"
+    # big | mini  (affects title/actionbar/chat styling)
     size: "big"
     title:
       fade_in: 5
       stay: 40
       fade_out: 5
 
-  # Supported placeholders: <timer>, <zone>, <player>
-  # Supported display values: title, actionbar, chat, bossbar
-  #   - bossbar shows a persistent progress bar that fills up as the next
-  #     reward approaches, instead of interrupting the screen like a title.
-  # Supported size values: big, mini (only affects title/actionbar/chat)
-  # Default size is big.
-  # Use MiniMessage tags and hex colors inside the template.
-  # Invalid sound names are now warned during config reload.
-
-  # Player-facing messages. MiniMessage tags supported. <zone> and <reward>
-  # placeholders are substituted with the zone/reward name before parsing.
+  # Player-facing messages (MiniMessage). Placeholders: <zone>, <reward>, <timer>, <player>
   messages:
     enter_zone: "<green>Entered AFK zone: <yellow><zone></yellow></green>"
     exit_zone: "<gray>You left AFK zone: <yellow><zone></yellow></gray>"
     reward_received: "<gold>You received reward: <yellow><reward></yellow></gold>"
     reward_failed: "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>"
 
-# Define as many rewards as you like under `rewards`.
-# Reward schema fields:
-# - executor: "itemedit" | "give" | "console" (itemedit uses ItemEdit `/si` syntax)
-# - item: the item name or award name (for ItemEdit this is the award identifier)
-# - amount: number of items to give
-# - interval_seconds: repeat every X seconds (set 0 to disable)
-# - once_after_seconds: give once after X seconds (set 0 to disable)
-# - priority: integer priority used when `global.on_multiple: "highest"`
-# - enabled: true/false - set to false to pause a reward without deleting its
-#   config (handy for seasonal/event rewards). Defaults to true if omitted.
-# Example rewards:
+# Reward definitions
+# executor: "give" | "itemedit" | "itemadder" | "console"
+#   give      -> /give <player> <item> <amount>
+#   itemedit  -> /si give <player> <item> <amount>
+#   itemadder -> /itemadder give <player> <item> <amount>
+#   console   -> arbitrary console command (use "command:" field with {player} placeholder)
+#
+# interval_seconds   : repeat every X seconds (0 = disabled)
+# once_after_seconds : give once after X seconds (0 = disabled)
+# priority           : used when on_multiple = "highest"
+# enabled            : false pauses the reward without deleting it
+
 rewards:
   welcome_diamond:
     description: "Give a diamond to the player"
-    executor: "give" # vanilla give -> /give <player> <item> <amount>
+    executor: "give"
     item: "diamond"
     amount: 1
     interval_seconds: 0
@@ -68,17 +61,10 @@ rewards:
 
   starter_kit:
     description: "Give starter items via ItemEdit"
-    executor: "itemedit" # ItemEdit uses `/si give <player> <item> <amount>`
+    executor: "itemedit"
     item: "starter_item"
     amount: 1
     interval_seconds: 0
     once_after_seconds: 0
     priority: 1
     enabled: true
-
-# Notes:
-# - Use `executor: itemedit` to dispatch `si give <player> <item> <amount>`.
-# - Use `executor: give` to dispatch `give <player> <item> <amount>`.
-# - Use `executor: console` to run an arbitrary console command; in that case
-#   set `command: "<console command with {player} placeholder>"` instead of
-#   `item`/`amount`.

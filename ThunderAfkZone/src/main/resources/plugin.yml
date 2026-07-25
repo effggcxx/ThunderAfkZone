@@ -1,18 +1,28 @@
-name: AfkZone
+name: ThunderAfkZone
 version: 1.0.0
 main: me.ehsan.afkzone.Main
 api-version: "1.21"
-softdepend: [WorldEdit]
+softdepend: [WorldEdit, ItemEdit]
 commands:
   afkzone:
     description: Manage AFK zones
     usage: /afkzone create <name> | list | info <name> | remove <name> | reload | reward list|give <reward> [player]
+    aliases: [taz, thunderafk]
 permissions:
   afkzone.create:
     description: Allows creating AFK zones with a WorldEdit selection
     default: op
   afkzone.reload:
     description: Allows reloading the AfkZone configuration
+    default: op
+  afkzone.list:
+    description: Allows listing AFK zones
+    default: op
+  afkzone.info:
+    description: Allows viewing zone info
+    default: op
+  afkzone.remove:
+    description: Allows removing AFK zones
     default: op
   afkzone.reward.list:
     description: Allows listing configured rewards

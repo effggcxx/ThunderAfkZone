@@ -1,9 +1,9 @@
 package me.ehsan.afkzone.util;
 
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
-import net.kyori.adventure.bossbar.BossBar;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
@@ -13,9 +13,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Logger;
 
-public class MessageUtils {
+/**
+ * Shared message / timer helpers. Currently most logic still lives in RewardManager;
+ * this class is kept for future extraction.
+ */
+public final class MessageUtils {
 
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+
+    private MessageUtils() {}
 
     public static void sendStyled(Player player, String template, String zoneName, String rewardName) {
         if (template == null || template.isEmpty()) return;
@@ -57,13 +63,9 @@ public class MessageUtils {
         UUID id = player.getUniqueId();
 
         switch (timerDisplay.toLowerCase(Locale.ROOT)) {
-            case "actionbar":
-                player.sendActionBar(component);
-                break;
-            case "chat":
-                player.sendMessage(component);
-                break;
-            case "bossbar": {
+            case "actionbar" -> player.sendActionBar(component);
+            case "chat" -> player.sendMessage(component);
+            case "bossbar" -> {
                 float progress = totalSeconds > 0
                         ? clamp01((float) (totalSeconds - secondsRemaining) / (float) totalSeconds)
                         : 0f;
@@ -76,16 +78,13 @@ public class MessageUtils {
                     bar.name(component);
                     bar.progress(progress);
                 }
-                break;
             }
-            default:
-                player.showTitle(Title.title(component, Component.empty(),
-                        Title.Times.times(
-                                Duration.ofMillis(titleFadeIn * 50L),
-                                Duration.ofMillis(titleStay * 50L),
-                                Duration.ofMillis(titleFadeOut * 50L)
-                        )));
-                break;
+            default -> player.showTitle(Title.title(component, Component.empty(),
+                    Title.Times.times(
+                            Duration.ofMillis(titleFadeIn * 50L),
+                            Duration.ofMillis(titleStay * 50L),
+                            Duration.ofMillis(titleFadeOut * 50L)
+                    )));
         }
     }
 
