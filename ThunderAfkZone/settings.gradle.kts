@@ -1,1 +1,1 @@
-rootProject.name = "GayCheck"
+rootProject.name = "ThunderAfkZone"

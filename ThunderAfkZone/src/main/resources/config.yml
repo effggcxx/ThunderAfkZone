@@ -16,18 +16,22 @@ global:
 	sound_volume: 1.0
 	sound_pitch: 1.0
 
-	# Timer display settings for AFK reward countdown.
+	# Timer display settings for AFK reward countdown
+	timer:
+		enabled: true
+		template: "<yellow><bold>Next reward in <timer></bold></yellow>"
+		display: "title"
+		size: "big"
+		title:
+			fade_in: 5
+			stay: 40
+			fade_out: 5
+
 	# Supported placeholders: <timer>
 	# Supported display values: title, actionbar, chat
 	# Supported size values: big, mini
 	# Default size is big.
 	# Use MiniMessage tags and hex colors inside the template.
-	# Example: timer.template: "<yellow><bold>Next reward in <timer></bold></yellow>"
-	# Example: timer.display: "actionbar"
-	# Example: timer.size: "mini"
-	# Example: timer.title.fade_in: 5
-	# Example: timer.title.stay: 40
-	# Example: timer.title.fade_out: 5
 	# Invalid sound names are now warned during config reload.
 
 # Define as many rewards as you like under `rewards`.
