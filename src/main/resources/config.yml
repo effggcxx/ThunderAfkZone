@@ -38,34 +38,41 @@ global:
 
 # Reward definitions
 # executor: "give" | "itemedit" | "itemadder" | "console"
+#
 #   give      -> /give <player> <item> <amount>
+#               Item name must be a valid Minecraft material in the correct format
+#               (lowercase with underscores), e.g. grass_block, diamond_sword, cooked_beef
+#
 #   itemedit  -> /si give <player> <item> <amount>
+#               IMPORTANT: You must first save the item using ItemEdit.
+#               The "item" value here must be exactly the same name you used when saving the item in ItemEdit.
+#
 #   itemadder -> /itemadder give <player> <item> <amount>
+#
 #   console   -> arbitrary console command (use "command:" field with {player} placeholder)
 #
 # interval_seconds   : repeat every X seconds (0 = disabled)
 # once_after_seconds : give once after X seconds (0 = disabled)
-# NOTE: a reward needs at least ONE of these set above 0, or it can never fire.
 # priority           : used when on_multiple = "highest"
 # enabled            : false pauses the reward without deleting it
 
 rewards:
   welcome_diamond:
-    description: "Give a diamond to the player once they've been AFK for 30s"
+    description: "Give a diamond to the player"
     executor: "give"
-    item: "diamond"
+    item: "diamond"                 # vanilla format: diamond, grass_block, etc.
     amount: 1
     interval_seconds: 0
-    once_after_seconds: 30
+    once_after_seconds: 0
     priority: 5
     enabled: true
 
   starter_kit:
-    description: "Give starter items via ItemEdit every 10 minutes AFK"
+    description: "Give starter items via ItemEdit"
     executor: "itemedit"
-    item: "starter_item"
+    item: "starter_item"            # must match the name you saved in ItemEdit
     amount: 1
-    interval_seconds: 600
+    interval_seconds: 0
     once_after_seconds: 0
     priority: 1
     enabled: true
