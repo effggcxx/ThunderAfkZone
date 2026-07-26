@@ -65,4 +65,21 @@ global:
 #   enabled            → false pauses the reward without deleting it
 
 rewards:
-  welcome
+  welcome_diamond:
+    description: "A diamond every 5 minutes of AFK"
+    executor: "give"
+    item: "diamond"
+    amount: 1
+    interval_seconds: 300
+    once_after_seconds: 0
+    priority: 5
+    enabled: true
+
+  starter_kit:
+    description: "One-time iron sword after 60 seconds of AFK"
+    executor: "console"
+    command: "give {player} iron_sword 1"
+    interval_seconds: 0
+    once_after_seconds: 60
+    priority: 10
+    enabled: true

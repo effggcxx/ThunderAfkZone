@@ -54,7 +54,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
-        case "reload" -> {
+case "reload" -> {
     if (!sender.hasPermission("afkzone.reload")) {
         msg(sender, "<red>You don't have permission.</red>");
         return true;
@@ -259,11 +259,12 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             msg(sender, "<yellow>Global rewards:</yellow>");
-            for (Reward r : rewardManager.getRewards().values()) {
-                String status = r.isEnabled() ? "<green>enabled</green>" : "<red>disabled</red>";
-                msg(sender, " <gray>- <white>" + r.getName() + "</white> <gray>(" + status + "<gray>, priority=" + r.getPriority()
-                        + ") <dark_gray>- " + r.getDescription());
-            }
+for (Reward r : rewardManager.getRewards().values()) {
+    String status = r.isEnabled() ? "<green>enabled</green>" : "<red>disabled</red>";
+    msg(sender, " <gray>- <white>" + r.getName() + "</white> <gray>(" + status
+            + "<gray>, priority=" + r.getPriority()
+            + ") <dark_gray>- " + r.getDescription());
+}
             return true;
         } else if (act.equals("give")) {
             if (!sender.hasPermission("afkzone.reward.give")) {
@@ -333,7 +334,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                     msg(sender, "<yellow>Zone <white>" + zone + "</white> rewards:</yellow>");
                     for (String name : assigned) {
                         Reward r = rewardManager.getRewards().get(name);
-                        String status = (r != null && r.isEnabled()) ? "<green>ok</green>" : "<red>missing/disabled</red>";
+                       String status = (r != null && r.isEnabled()) ? "<green>ok</green>" : "<red>missing/disabled</red>";
                         msg(sender, " <gray>- <white>" + name + "</white> <gray>(" + status + "<gray>)");
                     }
                 }
