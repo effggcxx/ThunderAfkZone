@@ -1,101 +1,96 @@
+# ============================================================
 # ThunderAfkZone configuration
-# config-version: 2
+# ============================================================
 
 global:
-  # Storage backend: "sqlite" (persistent) or "memory" (lost on restart)
-  # "sqlite" requires the org.xerial:sqlite-jdbc library declared in plugin.yml's
-  # `libraries:` block (Paper downloads it automatically on startup). Only switch
-  # to "sqlite" after confirming your server log shows "SQLite storage initialized"
-  # on startup - if that driver can't load, every AFK tick will fail silently and
-  # no rewards will be given. "memory" always works, just doesn't persist restarts.
-  storage: "memory"
-
-  # When multiple rewards are eligible at the same moment:
-  # "all"     - give every eligible reward
-  # "highest" - give only the reward(s) with the highest priority
+  # When multiple rewards become eligible at the same second:
+  #   "all"     → give every eligible reward
+  #   "highest" → give only the reward(s) with the highest priority
   on_multiple: "all"
 
-  # Seconds of inactivity before a player is considered AFK for rewards
+  # Seconds of inactivity before a player is considered AFK (rewards only tick while AFK)
   afk_threshold_seconds: 60
 
-  # Sounds (Bukkit Sound enum names). Invalid names are warned on reload.
+  # Storage backend: "sqlite" (persistent) or "memory" (resets on restart)
+  storage: "sqlite"
+
+  # Sounds (Bukkit Sound enum names). Invalid names are warned on reload and disabled.
   enter_sound: "ENTITY_PLAYER_LEVELUP"
   exit_sound: "ENTITY_ITEM_BREAK"
   reward_sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
   sound_volume: 1.0
   sound_pitch: 1.0
 
-  # Timer display settings for AFK reward countdown
+  # Countdown timer shown while the player is AFK in a zone
   timer:
     enabled: true
     template: "<yellow><bold>Next reward in <timer></bold></yellow>"
     # title | actionbar | chat | bossbar
     display: "title"
-    # big | mini  (affects title/actionbar/chat styling)
+    # big | mini  (affects title / actionbar / chat styling)
     size: "big"
     title:
       fade_in: 5
       stay: 40
       fade_out: 5
 
-  # Visual zone boundary particles
+  # Visual zone boundary particles (shown to nearby players)
   particles:
     enabled: true
-    # Particle type (Bukkit Particle enum)
-    type: "END_ROD"
-    # Number of particles per point
     count: 1
-    # Spacing between particles along edges (blocks)
-    spacing: 2.0
-    # Max distance from player to show particles
-    view_distance: 48.0
-    # How often to refresh particles (ticks, 20 = 1 second)
-    interval_ticks: 40
+    spacing: 2.0          # blocks between particles
+    view_distance: 48.0   # how far a player can be and still see them
+    interval_ticks: 40    # how often to redraw (20 ticks = 1 second)
 
-  # Player-facing messages (MiniMessage). Placeholders: <zone>, <reward>, <timer>, <player>
+  # Player-facing messages (MiniMessage format)
+  # Placeholders: <zone>  <reward>  <timer>  <player>
   messages:
     enter_zone: "<green>Entered AFK zone: <yellow><zone></yellow></green>"
-    exit_zone: "<gray>You left AFK zone: <yellow><zone></yellow></gray>"
+    exit_zone: "<gray>You left AFK zone: <yellow><zone></gray>"
     reward_received: "<gold>You received reward: <yellow><reward></yellow></gold>"
     reward_failed: "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>"
 
+# ============================================================
 # Reward definitions
-# executor: "give" | "itemedit" | "itemadder" | "console"
+# ============================================================
+# executor options:
+#   give      → /give <player> <item> <amount>
+#   itemedit  → /si give <player> <item> <amount>   (requires ItemEdit)
+#   itemadder → /itemadder give <player> <item> <amount>
+#   console   → run any console command (use the "command:" field)
 #
-#   give      -> /give <player> <item> <amount>
-#               Item name must be a valid Minecraft material in the correct format
-#               (lowercase with underscores), e.g. grass_block, diamond_sword, cooked_beef
-#
-#   itemedit  -> /si give <player> <item> <amount>
-#               IMPORTANT: You must first save the item using ItemEdit.
-#               The "item" value here must be exactly the same name you used when saving the item in ItemEdit.
-#
-#   itemadder -> /itemadder give <player> <item> <amount>
-#
-#   console   -> arbitrary console command (use "command:" field with {player} placeholder)
-#
-# interval_seconds   : repeat every X seconds (0 = disabled)
-# once_after_seconds : give once after X seconds (0 = disabled)
-# priority           : used when on_multiple = "highest"
-# enabled            : false pauses the reward without deleting it
+# Timing:
+#   interval_seconds   → repeat every X seconds (0 = disabled)
+#   once_after_seconds → give once after X seconds of AFK (0 = disabled)
+#   priority           → used only when on_multiple = "highest"
+#   enabled            → false pauses the reward without deleting it
 
 rewards:
   welcome_diamond:
-    description: "Give a diamond to the player"
+    description: "A diamond every 5 minutes of AFK"
     executor: "give"
-    item: "diamond"                 # vanilla format: diamond, grass_block, etc.
+    item: "diamond"
     amount: 1
-    interval_seconds: 0
+    interval_seconds: 300
     once_after_seconds: 0
     priority: 5
     enabled: true
 
   starter_kit:
-    description: "Give starter items via ItemEdit"
-    executor: "itemedit"
-    item: "starter_item"            # must match the name you saved in ItemEdit
-    amount: 1
+    description: "One-time iron sword after 60 seconds of AFK"
+    executor: "console"
+    command: "give {player} iron_sword 1"
     interval_seconds: 0
-    once_after_seconds: 0
-    priority: 1
+    once_after_seconds: 60
+    priority: 10
     enabled: true
+
+  # Example: money reward every 10 minutes (requires an economy plugin that supports console commands)
+  # money_reward:
+  #   description: "Give $50 every 10 minutes"
+  #   executor: "console"
+  #   command: "eco give {player} 50"
+  #   interval_seconds: 600
+  #   once_after_seconds: 0
+  #   priority: 3
+  #   enabled: true
