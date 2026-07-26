@@ -46,7 +46,7 @@ global:
   # Placeholders: <zone>  <reward>  <timer>  <player>
   messages:
     enter_zone: "<green>Entered AFK zone: <yellow><zone></yellow></green>"
-    exit_zone: "<gray>You left AFK zone: <yellow><zone></gray>"
+    exit_zone: "<gray>You left AFK zone: <yellow><zone></yellow></gray>"
     reward_received: "<gold>You received reward: <yellow><reward></yellow></gold>"
     reward_failed: "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>"
 
@@ -56,7 +56,6 @@ global:
 # executor options:
 #   give      → /give <player> <item> <amount>
 #   itemedit  → /si give <player> <item> <amount>   (requires ItemEdit)
-#   itemadder → /itemadder give <player> <item> <amount>
 #   console   → run any console command (use the "command:" field)
 #
 # Timing:
@@ -66,31 +65,4 @@ global:
 #   enabled            → false pauses the reward without deleting it
 
 rewards:
-  welcome_diamond:
-    description: "A diamond every 5 minutes of AFK"
-    executor: "give"
-    item: "diamond"
-    amount: 1
-    interval_seconds: 300
-    once_after_seconds: 0
-    priority: 5
-    enabled: true
-
-  starter_kit:
-    description: "One-time iron sword after 60 seconds of AFK"
-    executor: "console"
-    command: "give {player} iron_sword 1"
-    interval_seconds: 0
-    once_after_seconds: 60
-    priority: 10
-    enabled: true
-
-  # Example: money reward every 10 minutes (requires an economy plugin that supports console commands)
-  # money_reward:
-  #   description: "Give $50 every 10 minutes"
-  #   executor: "console"
-  #   command: "eco give {player} 50"
-  #   interval_seconds: 600
-  #   once_after_seconds: 0
-  #   priority: 3
-  #   enabled: true
+  welcome
