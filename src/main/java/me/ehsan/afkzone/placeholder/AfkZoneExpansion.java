@@ -79,11 +79,9 @@ public class AfkZoneExpansion extends PlaceholderExpansion {
                 return playerTracker.isPlayerInAnyZone(id) ? "yes" : "no";
             }
             case "time" -> {
-                // Total AFK time in current session (in the zone)
-                String zone = playerTracker.getPlayerZone(id);
-                if (zone == null) return "0s";
-                Map<String, Integer> progress = playerTracker.getProgress(id);
-                int totalSeconds = progress.values().stream().mapToInt(Integer::intValue).sum();
+                // Current-session AFK time (resets when the player leaves the zone)
+                if (!playerTracker.isPlayerInAnyZone(id)) return "0s";
+                int totalSeconds = playerTracker.getSessionSeconds(id);
                 return MessageUtils.formatDuration(totalSeconds);
             }
             case "next_reward" -> {

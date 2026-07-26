@@ -182,6 +182,12 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         int rewardsReceived = storageService.getTotalRewardsReceived(targetId);
 
         msg(sender, "<yellow>Statistics for <white>" + targetName + "</white>:</yellow>");
+        if (rewardManager.getPlayerTracker().isPlayerInAnyZone(targetId)) {
+            int sessionSeconds = rewardManager.getPlayerTracker().getSessionSeconds(targetId);
+            String zone = rewardManager.getPlayerTracker().getPlayerZone(targetId);
+            msg(sender, "  <gray>Current session: <white>" + MessageUtils.formatDuration(sessionSeconds)
+                    + "</white> <dark_gray>(in " + zone + ")</dark_gray></gray>");
+        }
         msg(sender, "  <gray>Total AFK time: <white>" + MessageUtils.formatDuration(totalAfkTime) + "</white></gray>");
         msg(sender, "  <gray>Rewards received: <white>" + rewardsReceived + "</white></gray>");
 

@@ -207,6 +207,11 @@ public class RewardManager {
             prog.merge(r.getName(), 1, Integer::sum);
         }
 
+        // Current-session counter (resets on next zone entry) - separate from
+        // both the per-reward progress counters above and the lifetime totals
+        // in storageService below, which are unaffected by leaving the zone.
+        playerTracker.incrementSession(id);
+
         // Track AFK time in storage. Wrapped separately so a storage failure
         // (e.g. SQLite driver missing) can't block reward delivery below -
         // stats are best-effort, rewards are the core mechanic.

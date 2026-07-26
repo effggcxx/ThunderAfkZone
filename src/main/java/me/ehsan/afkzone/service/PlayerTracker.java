@@ -20,6 +20,10 @@ public class PlayerTracker {
     private final Map<UUID, Set<String>> playerGivenOnce = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerZone = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastActive = new ConcurrentHashMap<>();
+    // Current-session AFK seconds, separate from per-reward progress counters.
+    // Resets to 0 on every new tracking session (zone enter); NOT persisted -
+    // lifetime totals live in StorageService and are untouched by this.
+    private final Map<UUID, Integer> sessionAfkSeconds = new ConcurrentHashMap<>();
 
     public PlayerTracker() {}
 
@@ -49,6 +53,7 @@ public class PlayerTracker {
         playerZone.put(id, zoneName);
         playerProgress.put(id, new ConcurrentHashMap<>());
         playerGivenOnce.put(id, ConcurrentHashMap.newKeySet());
+        sessionAfkSeconds.put(id, 0);
         // Treat join as active so the AFK threshold has to pass before rewards start
         lastActive.put(id, System.currentTimeMillis());
 
@@ -61,6 +66,7 @@ public class PlayerTracker {
         playerGivenOnce.remove(id);
         String zone = playerZone.remove(id);
         lastActive.remove(id);
+        sessionAfkSeconds.remove(id);
 
         Player player = org.bukkit.Bukkit.getPlayer(id);
         if (player != null && zone != null) {
@@ -76,6 +82,7 @@ public class PlayerTracker {
         playerGivenOnce.remove(id);
         playerZone.remove(id);
         lastActive.remove(id);
+        sessionAfkSeconds.remove(id);
     }
 
     // --- Activity ---
@@ -98,10 +105,25 @@ public class PlayerTracker {
         return playerGivenOnce.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
     }
 
+    // --- Current-session AFK time (resets on every new tracking session) ---
+
+    /**
+     * Increments this session's AFK-seconds counter by one. Call once per
+     * tick per player - NOT once per reward, unlike getProgress().
+     */
+    public void incrementSession(UUID id) {
+        sessionAfkSeconds.merge(id, 1, Integer::sum);
+    }
+
+    public int getSessionSeconds(UUID id) {
+        return sessionAfkSeconds.getOrDefault(id, 0);
+    }
+
     public void clear() {
         playerProgress.clear();
         playerGivenOnce.clear();
         playerZone.clear();
         lastActive.clear();
+        sessionAfkSeconds.clear();
     }
 }
