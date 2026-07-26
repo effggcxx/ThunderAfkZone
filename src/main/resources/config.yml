@@ -45,26 +45,27 @@ global:
 #
 # interval_seconds   : repeat every X seconds (0 = disabled)
 # once_after_seconds : give once after X seconds (0 = disabled)
+# NOTE: a reward needs at least ONE of these set above 0, or it can never fire.
 # priority           : used when on_multiple = "highest"
 # enabled            : false pauses the reward without deleting it
 
 rewards:
   welcome_diamond:
-    description: "Give a diamond to the player"
+    description: "Give a diamond to the player once they've been AFK for 30s"
     executor: "give"
     item: "diamond"
     amount: 1
     interval_seconds: 0
-    once_after_seconds: 0
+    once_after_seconds: 30
     priority: 5
     enabled: true
 
   starter_kit:
-    description: "Give starter items via ItemEdit"
+    description: "Give starter items via ItemEdit every 10 minutes AFK"
     executor: "itemedit"
     item: "starter_item"
     amount: 1
-    interval_seconds: 0
+    interval_seconds: 600
     once_after_seconds: 0
     priority: 1
     enabled: true
