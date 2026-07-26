@@ -4,6 +4,7 @@ import me.ehsan.afkzone.Main;
 import me.ehsan.afkzone.managers.RewardManager;
 import me.ehsan.afkzone.managers.ZoneManager;
 import me.ehsan.afkzone.models.Reward;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -23,6 +24,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
     private final Main plugin;
     private final ZoneManager zoneManager;
     private final RewardManager rewardManager;
+    private static final MiniMessage MM = MiniMessage.miniMessage();
 
     private static final List<String> ROOT_SUBS = Arrays.asList(
             "create", "list", "info", "remove", "reload", "reward", "zonereward"
@@ -32,6 +34,23 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         this.plugin = plugin;
         this.zoneManager = zoneManager;
         this.rewardManager = rewardManager;
+    }
+
+    /**
+     * Sends a MiniMessage-styled message to any CommandSender (players and console
+     * both implement Audience on Paper), keeping admin command output styled the
+     * same way as the player-facing zone/reward messages. Falls back to a
+     * tag-stripped plain message if a value interpolated into the template
+     * (a zone/reward name, an exception message, etc.) happens to contain a
+     * stray '<' that breaks MiniMessage parsing - same defensive pattern
+     * already used in RewardManager.
+     */
+    private void msg(CommandSender sender, String miniText) {
+        try {
+            sender.sendMessage(MM.deserialize(miniText));
+        } catch (Exception ex) {
+            sender.sendMessage(miniText.replaceAll("<[^>]+>", ""));
+        }
     }
 
     @Override
@@ -45,14 +64,14 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         switch (sub) {
             case "reload" -> {
                 if (!sender.hasPermission("afkzone.reload")) {
-                    sender.sendMessage("§cYou don't have permission.");
+                    msg(sender, "<red>You don't have permission.</red>");
                     return true;
                 }
                 plugin.reloadConfig();
                 rewardManager.loadRewards();
                 rewardManager.loadGlobalConfig();
                 zoneManager.loadZonesFile();
-                sender.sendMessage("§aAfkZone configuration reloaded.");
+                msg(sender, "<green>AfkZone configuration reloaded.</green>");
                 return true;
             }
             case "reward" -> {
@@ -63,15 +82,15 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             }
             case "create" -> {
                 if (!(sender instanceof Player player)) {
-                    sender.sendMessage("§cOnly players can create zones.");
+                    msg(sender, "<red>Only players can create zones.</red>");
                     return true;
                 }
                 if (!sender.hasPermission("afkzone.create")) {
-                    sender.sendMessage("§cYou don't have permission.");
+                    msg(sender, "<red>You don't have permission.</red>");
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage("§cUsage: /afkzone create <name>");
+                    msg(sender, "<red>Usage: /afkzone create [name]</red>");
                     return true;
                 }
                 zoneManager.createZoneFromWorldEditSelection(player, args[1]);
@@ -79,7 +98,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             }
             case "list" -> {
                 if (!sender.hasPermission("afkzone.list")) {
-                    sender.sendMessage("§cYou don't have permission.");
+                    msg(sender, "<red>You don't have permission.</red>");
                     return true;
                 }
                 listZones(sender);
@@ -87,11 +106,11 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             }
             case "info" -> {
                 if (!sender.hasPermission("afkzone.info")) {
-                    sender.sendMessage("§cYou don't have permission.");
+                    msg(sender, "<red>You don't have permission.</red>");
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage("§cUsage: /afkzone info <name>");
+                    msg(sender, "<red>Usage: /afkzone info [name]</red>");
                     return true;
                 }
                 showZoneInfo(sender, args[1]);
@@ -99,11 +118,11 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             }
             case "remove", "delete" -> {
                 if (!sender.hasPermission("afkzone.remove")) {
-                    sender.sendMessage("§cYou don't have permission.");
+                    msg(sender, "<red>You don't have permission.</red>");
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage("§cUsage: /afkzone remove <name>");
+                    msg(sender, "<red>Usage: /afkzone remove [name]</red>");
                     return true;
                 }
                 removeZone(sender, args[1]);
@@ -117,176 +136,165 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendUsage(CommandSender sender) {
-        sender.sendMessage("§e/afkzone create <name> §7- create zone from WorldEdit selection");
-        sender.sendMessage("§e/afkzone list §7- list zones");
-        sender.sendMessage("§e/afkzone info <name> §7- zone details + rewards");
-        sender.sendMessage("§e/afkzone remove <name> §7- remove a zone");
-        sender.sendMessage("§e/afkzone reload §7- reload config");
-        sender.sendMessage("§e/afkzone reward list|give <reward> [player]");
-        sender.sendMessage("§e/afkzone zonereward list|add|remove <zone> [reward]");
+        msg(sender, "<yellow>/afkzone create [name] <gray>- create zone from WorldEdit selection</gray></yellow>");
+        msg(sender, "<yellow>/afkzone list <gray>- list zones</gray></yellow>");
+        msg(sender, "<yellow>/afkzone info [name] <gray>- zone details + rewards</gray></yellow>");
+        msg(sender, "<yellow>/afkzone remove [name] <gray>- remove a zone</gray></yellow>");
+        msg(sender, "<yellow>/afkzone reload <gray>- reload config</gray></yellow>");
+        msg(sender, "<yellow>/afkzone reward list|give [reward] [player]</yellow>");
+        msg(sender, "<yellow>/afkzone zonereward list|add|remove [zone] [reward]</yellow>");
     }
 
     private boolean handleRewardCommand(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage("§cUsage: /afkzone reward list | give <reward> [player]");
+            msg(sender, "<red>Usage: /afkzone reward list | give [reward] [player]</red>");
             return true;
         }
         String act = args[1].toLowerCase(Locale.ROOT);
         if (act.equals("list")) {
             if (!sender.hasPermission("afkzone.reward.list")) {
-                sender.sendMessage("§cYou don't have permission.");
+                msg(sender, "<red>You don't have permission.</red>");
                 return true;
             }
             if (rewardManager.getRewards().isEmpty()) {
-                sender.sendMessage("§7No rewards configured.");
+                msg(sender, "<gray>No rewards configured.</gray>");
                 return true;
             }
-            sender.sendMessage("§eGlobal rewards:");
+            msg(sender, "<yellow>Global rewards:</yellow>");
             for (Reward r : rewardManager.getRewards().values()) {
-                String status = r.enabled ? "§aenabled" : "§cdisabled";
-                sender.sendMessage(" §7- §f" + r.name + " §7(" + status + "§7, priority=" + r.priority + ") §8- " + r.description);
+                String status = r.enabled ? "<green>enabled</green>" : "<red>disabled</red>";
+                msg(sender, " <gray>- <white>" + r.name + "</white> <gray>(" + status + "<gray>, priority=" + r.priority
+                        + ") <dark_gray>- " + r.description);
             }
             return true;
         } else if (act.equals("give")) {
             if (!sender.hasPermission("afkzone.reward.give")) {
-                sender.sendMessage("§cYou don't have permission.");
+                msg(sender, "<red>You don't have permission.</red>");
                 return true;
             }
             if (args.length < 3) {
-                sender.sendMessage("§cUsage: /afkzone reward give <reward> [player]");
+                msg(sender, "<red>Usage: /afkzone reward give [reward] [player]</red>");
                 return true;
             }
             String rewardName = args[2];
             Reward r = rewardManager.getRewards().get(rewardName);
             if (r == null) {
-                sender.sendMessage("§cUnknown reward: " + rewardName);
+                msg(sender, "<red>Unknown reward: " + rewardName + "</red>");
                 return true;
             }
             Player target = null;
             if (args.length >= 4) {
                 target = plugin.getServer().getPlayerExact(args[3]);
                 if (target == null) {
-                    sender.sendMessage("§cPlayer not found: " + args[3]);
+                    msg(sender, "<red>Player not found: " + args[3] + "</red>");
                     return true;
                 }
             } else if (sender instanceof Player p) {
                 target = p;
             }
             if (target == null) {
-                sender.sendMessage("§cNo target player specified.");
+                msg(sender, "<red>No target player specified.</red>");
                 return true;
             }
             rewardManager.giveRewardToPlayer(r, target);
-            sender.sendMessage("§aGave reward §e" + rewardName + " §ato §e" + target.getName());
+            msg(sender, "<green>Gave reward <yellow>" + rewardName + "</yellow> to <yellow>" + target.getName() + "</yellow></green>");
             return true;
         }
-        sender.sendMessage("§cUsage: /afkzone reward list | give <reward> [player]");
+        msg(sender, "<red>Usage: /afkzone reward list | give [reward] [player]</red>");
         return true;
     }
 
     private boolean handleZoneRewardCommand(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("afkzone.zonereward")) {
+            msg(sender, "<red>You don't have permission.</red>");
+            return true;
+        }
         if (args.length < 2) {
-            sender.sendMessage("§cUsage: /afkzone zonereward list <zone> | add <zone> <reward> | remove <zone> <reward> | clear <zone>");
+            msg(sender, "<red>Usage: /afkzone zonereward list [zone] | add [zone] [reward] | remove [zone] [reward] | clear [zone]</red>");
             return true;
         }
         String act = args[1].toLowerCase(Locale.ROOT);
 
         switch (act) {
             case "list" -> {
-                if (!sender.hasPermission("afkzone.zonereward.list")) {
-                    sender.sendMessage("§cYou don't have permission.");
-                    return true;
-                }
                 if (args.length < 3) {
-                    sender.sendMessage("§cUsage: /afkzone zonereward list <zone>");
+                    msg(sender, "<red>Usage: /afkzone zonereward list [zone]</red>");
                     return true;
                 }
                 String zone = args[2];
                 if (!zoneManager.zoneExists(zone)) {
-                    sender.sendMessage("§cZone '" + zone + "' does not exist.");
+                    msg(sender, "<red>Zone '" + zone + "' does not exist.</red>");
                     return true;
                 }
                 List<String> assigned = zoneManager.getZoneRewards(zone);
                 if (assigned.isEmpty()) {
-                    sender.sendMessage("§eZone §f" + zone + " §euses §aall enabled global rewards§e (no restriction).");
+                    msg(sender, "<yellow>Zone <white>" + zone + "</white> uses <green>all enabled global rewards</green> (no restriction).</yellow>");
                 } else {
-                    sender.sendMessage("§eZone §f" + zone + " §erewards:");
+                    msg(sender, "<yellow>Zone <white>" + zone + "</white> rewards:</yellow>");
                     for (String name : assigned) {
                         Reward r = rewardManager.getRewards().get(name);
-                        String status = (r != null && r.enabled) ? "§aok" : "§cmissing/disabled";
-                        sender.sendMessage(" §7- §f" + name + " §7(" + status + "§7)");
+                        String status = (r != null && r.enabled) ? "<green>ok</green>" : "<red>missing/disabled</red>";
+                        msg(sender, " <gray>- <white>" + name + "</white> <gray>(" + status + "<gray>)");
                     }
                 }
                 return true;
             }
             case "add" -> {
-                if (!sender.hasPermission("afkzone.zonereward.add")) {
-                    sender.sendMessage("§cYou don't have permission.");
-                    return true;
-                }
                 if (args.length < 4) {
-                    sender.sendMessage("§cUsage: /afkzone zonereward add <zone> <reward>");
+                    msg(sender, "<red>Usage: /afkzone zonereward add [zone] [reward]</red>");
                     return true;
                 }
                 String zone = args[2];
                 String reward = args[3];
                 if (!zoneManager.zoneExists(zone)) {
-                    sender.sendMessage("§cZone '" + zone + "' does not exist.");
+                    msg(sender, "<red>Zone '" + zone + "' does not exist.</red>");
                     return true;
                 }
                 if (!rewardManager.getRewards().containsKey(reward)) {
-                    sender.sendMessage("§cUnknown reward: " + reward);
+                    msg(sender, "<red>Unknown reward: " + reward + "</red>");
                     return true;
                 }
                 if (zoneManager.addZoneReward(zone, reward)) {
-                    sender.sendMessage("§aAdded reward §e" + reward + " §ato zone §e" + zone);
+                    msg(sender, "<green>Added reward <yellow>" + reward + "</yellow> to zone <yellow>" + zone + "</yellow></green>");
                 } else {
-                    sender.sendMessage("§eReward §f" + reward + " §eis already assigned to §f" + zone);
+                    msg(sender, "<yellow>Reward <white>" + reward + "</white> is already assigned to <white>" + zone + "</white></yellow>");
                 }
                 return true;
             }
             case "remove" -> {
-                if (!sender.hasPermission("afkzone.zonereward.remove")) {
-                    sender.sendMessage("§cYou don't have permission.");
-                    return true;
-                }
                 if (args.length < 4) {
-                    sender.sendMessage("§cUsage: /afkzone zonereward remove <zone> <reward>");
+                    msg(sender, "<red>Usage: /afkzone zonereward remove [zone] [reward]</red>");
                     return true;
                 }
                 String zone = args[2];
                 String reward = args[3];
                 if (!zoneManager.zoneExists(zone)) {
-                    sender.sendMessage("§cZone '" + zone + "' does not exist.");
+                    msg(sender, "<red>Zone '" + zone + "' does not exist.</red>");
                     return true;
                 }
                 if (zoneManager.removeZoneReward(zone, reward)) {
-                    sender.sendMessage("§aRemoved reward §e" + reward + " §afrom zone §e" + zone);
+                    msg(sender, "<green>Removed reward <yellow>" + reward + "</yellow> from zone <yellow>" + zone + "</yellow></green>");
                 } else {
-                    sender.sendMessage("§eReward §f" + reward + " §ewas not assigned to §f" + zone);
+                    msg(sender, "<yellow>Reward <white>" + reward + "</white> was not assigned to <white>" + zone + "</white></yellow>");
                 }
                 return true;
             }
             case "clear" -> {
-                if (!sender.hasPermission("afkzone.zonereward.clear")) {
-                    sender.sendMessage("§cYou don't have permission.");
-                    return true;
-                }
                 if (args.length < 3) {
-                    sender.sendMessage("§cUsage: /afkzone zonereward clear <zone>");
+                    msg(sender, "<red>Usage: /afkzone zonereward clear [zone]</red>");
                     return true;
                 }
                 String zone = args[2];
                 if (!zoneManager.zoneExists(zone)) {
-                    sender.sendMessage("§cZone '" + zone + "' does not exist.");
+                    msg(sender, "<red>Zone '" + zone + "' does not exist.</red>");
                     return true;
                 }
                 zoneManager.setZoneRewards(zone, Collections.emptyList());
-                sender.sendMessage("§aCleared reward restrictions for §e" + zone + "§a. It now uses all global rewards.");
+                msg(sender, "<green>Cleared reward restrictions for <yellow>" + zone + "</yellow>. It now uses all global rewards.</green>");
                 return true;
             }
             default -> {
-                sender.sendMessage("§cUsage: /afkzone zonereward list|add|remove|clear ...");
+                msg(sender, "<red>Usage: /afkzone zonereward list|add|remove|clear ...</red>");
                 return true;
             }
         }
@@ -295,10 +303,10 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
     private void listZones(CommandSender sender) {
         FileConfiguration zonesConfig = zoneManager.getZonesConfig();
         if (zonesConfig == null || !zonesConfig.isConfigurationSection("zones")) {
-            sender.sendMessage("§7No zones configured.");
+            msg(sender, "<gray>No zones configured.</gray>");
             return;
         }
-        sender.sendMessage("§eAFK Zones:");
+        msg(sender, "<yellow>AFK Zones:</yellow>");
         for (String key : zonesConfig.getConfigurationSection("zones").getKeys(false)) {
             String path = "zones." + key;
             String world = zonesConfig.getString(path + ".world", "unknown");
@@ -309,15 +317,15 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             int y2 = zonesConfig.getInt(path + ".y2", 0);
             int z2 = zonesConfig.getInt(path + ".z2", 0);
             List<String> rewards = zoneManager.getZoneRewards(key);
-            String rewardInfo = rewards.isEmpty() ? "§7all global" : "§f" + rewards.size() + " reward(s)";
-            sender.sendMessage(" §f" + key + " §7→ " + world + " (" + x1 + "," + y1 + "," + z1 + ")→(" + x2 + "," + y2 + "," + z2 + ") §8| " + rewardInfo);
+            String rewardInfo = rewards.isEmpty() ? "<gray>all global</gray>" : "<white>" + rewards.size() + " reward(s)</white>";
+            msg(sender, " <white>" + key + "</white> <gray>-></gray> " + world + " (" + x1 + "," + y1 + "," + z1 + ")->(" + x2 + "," + y2 + "," + z2 + ") <dark_gray>|</dark_gray> " + rewardInfo);
         }
     }
 
     private void showZoneInfo(CommandSender sender, String name) {
         FileConfiguration zonesConfig = zoneManager.getZonesConfig();
         if (zonesConfig == null || !zonesConfig.isConfigurationSection("zones") || !zonesConfig.isSet("zones." + name)) {
-            sender.sendMessage("§cZone '" + name + "' does not exist.");
+            msg(sender, "<red>Zone '" + name + "' does not exist.</red>");
             return;
         }
         String path = "zones." + name;
@@ -329,27 +337,27 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         int y2 = zonesConfig.getInt(path + ".y2", 0);
         int z2 = zonesConfig.getInt(path + ".z2", 0);
 
-        sender.sendMessage("§eZone §f'" + name + "'§e:");
-        sender.sendMessage("  §7World: §f" + world);
-        sender.sendMessage("  §7Corners: §f(" + x1 + "," + y1 + "," + z1 + ") → (" + x2 + "," + y2 + "," + z2 + ")");
-        sender.sendMessage("  §7Size: §f" + (Math.abs(x2 - x1) + 1) + " x " + (Math.abs(y2 - y1) + 1) + " x " + (Math.abs(z2 - z1) + 1));
+        msg(sender, "<yellow>Zone <white>'" + name + "'</white>:</yellow>");
+        msg(sender, "  <gray>World: <white>" + world + "</white></gray>");
+        msg(sender, "  <gray>Corners: <white>(" + x1 + "," + y1 + "," + z1 + ") -> (" + x2 + "," + y2 + "," + z2 + ")</white></gray>");
+        msg(sender, "  <gray>Size: <white>" + (Math.abs(x2 - x1) + 1) + " x " + (Math.abs(y2 - y1) + 1) + " x " + (Math.abs(z2 - z1) + 1) + "</white></gray>");
 
         List<String> assigned = zoneManager.getZoneRewards(name);
         if (assigned.isEmpty()) {
-            sender.sendMessage("  §7Rewards: §aall enabled global rewards");
+            msg(sender, "  <gray>Rewards: <green>all enabled global rewards</green></gray>");
             for (Reward r : rewardManager.getRewards().values()) {
                 if (!r.enabled) continue;
-                sender.sendMessage("   §8- §f" + r.name + " §7(priority=" + r.priority + ")");
+                msg(sender, "   <dark_gray>- <white>" + r.name + "</white> <gray>(priority=" + r.priority + ")</gray>");
             }
         } else {
-            sender.sendMessage("  §7Rewards (§f" + assigned.size() + "§7 assigned):");
+            msg(sender, "  <gray>Rewards (<white>" + assigned.size() + "</white> assigned):</gray>");
             for (String rn : assigned) {
                 Reward r = rewardManager.getRewards().get(rn);
                 if (r == null) {
-                    sender.sendMessage("   §8- §c" + rn + " §7(missing from config!)");
+                    msg(sender, "   <dark_gray>- <red>" + rn + "</red> <gray>(missing from config!)</gray>");
                 } else {
-                    String status = r.enabled ? "§aenabled" : "§cdisabled";
-                    sender.sendMessage("   §8- §f" + rn + " §7(" + status + "§7, priority=" + r.priority + ")");
+                    String status = r.enabled ? "<green>enabled</green>" : "<red>disabled</red>";
+                    msg(sender, "   <dark_gray>- <white>" + rn + "</white> <gray>(" + status + "<gray>, priority=" + r.priority + ")");
                 }
             }
         }
@@ -357,11 +365,11 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
 
     private void removeZone(CommandSender sender, String name) {
         if (!zoneManager.zoneExists(name)) {
-            sender.sendMessage("§cZone '" + name + "' does not exist.");
+            msg(sender, "<red>Zone '" + name + "' does not exist.</red>");
             return;
         }
         zoneManager.removeZone(name);
-        sender.sendMessage("§aZone '" + name + "' removed.");
+        msg(sender, "<green>Zone '" + name + "' removed.</green>");
     }
 
     @Override
@@ -374,7 +382,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 2) {
             switch (sub) {
-                case "info", "remove", "delete", "create" -> {
+                case "info", "remove", "delete" -> {
                     return filter(new ArrayList<>(zoneManager.getZoneNames()), args[1]);
                 }
                 case "reward" -> {

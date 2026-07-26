@@ -1,9 +1,9 @@
 package me.ehsan.afkzone.listeners;
 
+import io.papermc.paper.event.player.AsyncChatEvent;
 import me.ehsan.afkzone.managers.RewardManager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 
@@ -21,7 +21,7 @@ public class ActivityListener implements Listener {
     }
 
     @EventHandler
-    public void onChat(AsyncPlayerChatEvent e) {
+    public void onChat(AsyncChatEvent e) {
         rewardManager.markActive(e.getPlayer().getUniqueId());
     }
 

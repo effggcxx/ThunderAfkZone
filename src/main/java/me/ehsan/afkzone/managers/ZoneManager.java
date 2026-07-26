@@ -8,6 +8,7 @@ import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.regions.Region;
 import com.sk89q.worldedit.session.SessionManager;
 import me.ehsan.afkzone.Main;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -147,7 +148,7 @@ public class ZoneManager {
      */
     public boolean createZoneFromWorldEditSelection(Player player, String name) {
         if (plugin.getServer().getPluginManager().getPlugin("WorldEdit") == null) {
-            player.sendMessage("§cWorldEdit is not installed on this server.");
+            msg(player, "<red>WorldEdit is not installed on this server.</red>");
             return false;
         }
 
@@ -158,7 +159,7 @@ public class ZoneManager {
 
             Region region = session.getSelection(wePlayer.getWorld());
             if (region == null) {
-                player.sendMessage("§cYou must make a WorldEdit selection with the wand first.");
+                msg(player, "<red>You must make a WorldEdit selection with the wand first.</red>");
                 return false;
             }
 
@@ -188,18 +189,31 @@ public class ZoneManager {
             // No rewards list → uses all global rewards by default
             saveZonesFile();
 
-            player.sendMessage("§aAFK zone '" + name + "' created: " + world.getName()
-                    + " (" + x1 + "," + y1 + "," + z1 + ") → (" + x2 + "," + y2 + "," + z2 + ")");
-            player.sendMessage("§7Tip: Use §e/afkzone zonereward add " + name + " <reward>§7 to restrict rewards for this zone.");
+            msg(player, "<green>AFK zone '" + name + "' created: " + world.getName()
+                    + " (" + x1 + "," + y1 + "," + z1 + ") -> (" + x2 + "," + y2 + "," + z2 + ")</green>");
+            msg(player, "<gray>Tip: Use <yellow>/afkzone zonereward add " + name + " [reward]</yellow> to restrict rewards for this zone.</gray>");
             return true;
 
         } catch (com.sk89q.worldedit.IncompleteRegionException e) {
-            player.sendMessage("§cIncomplete WorldEdit selection. Select both corners first.");
+            msg(player, "<red>Incomplete WorldEdit selection. Select both corners first.</red>");
             return false;
         } catch (Exception e) {
-            player.sendMessage("§cError reading WorldEdit selection: " + e.getMessage());
+            msg(player, "<red>Error reading WorldEdit selection: " + e.getMessage() + "</red>");
             plugin.getLogger().severe("Error reading WorldEdit selection: " + e);
             return false;
+        }
+    }
+
+    /**
+     * Sends a MiniMessage-styled message, falling back to a tag-stripped plain
+     * message if the interpolated content (e.g. an exception message) breaks
+     * parsing - same defensive pattern used elsewhere in the plugin.
+     */
+    private void msg(Player player, String miniText) {
+        try {
+            player.sendMessage(MiniMessage.miniMessage().deserialize(miniText));
+        } catch (Exception ex) {
+            player.sendMessage(miniText.replaceAll("<[^>]+>", ""));
         }
     }
 }
