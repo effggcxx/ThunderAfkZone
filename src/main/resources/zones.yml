@@ -1,0 +1,36 @@
+# ============================================================
+# ThunderAfkZone zone definitions
+# ============================================================
+# Each zone defines a cuboid region. Players standing inside
+# an AFK zone while idle will receive rewards after the
+# configured afk_threshold_seconds in config.yml.
+#
+# Create a zone with: /afkzone create <name>
+# (select the region with WorldEdit wand first)
+#
+# Zone format:
+#   zones:
+#     <zone_name>:
+#       world: "world"
+#       x1: 0    y1: 0    z1: 0
+#       x2: 0    y2: 0    z2: 0
+#       rewards:                     # optional: restrict which global
+#         - "reward_name"            # rewards apply in this zone
+#       on_enter:
+#         commands:                  # console commands on zone entry
+#           - "say %player% entered <zone>"
+#       on_exit:
+#         commands:                  # console commands on zone exit
+#           - "say %player% left <zone>"
+#
+# Per-zone config overrides (optional):
+#   These override the matching keys in config.yml for players
+#   inside this zone:
+#       afk_threshold_seconds: 30
+#       enter_sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
+#       exit_sound: "none"
+#       reward_sound: "none"
+#       timer.enabled: false
+# ============================================================
+
+zones: {}

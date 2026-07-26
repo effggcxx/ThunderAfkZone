@@ -39,12 +39,7 @@ public class ZoneManager implements ZoneService {
     public void loadZonesFile() {
         zonesFile = new File(plugin.getDataFolder(), "zones.yml");
         if (!zonesFile.exists()) {
-            try {
-                plugin.getDataFolder().mkdirs();
-                zonesFile.createNewFile();
-            } catch (Exception e) {
-                plugin.getLogger().severe("Could not create zones.yml: " + e.getMessage());
-            }
+            plugin.saveResource("zones.yml", false);
         }
         zonesConfig = YamlConfiguration.loadConfiguration(zonesFile);
         rebuildSpatialIndex();
