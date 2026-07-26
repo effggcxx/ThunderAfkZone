@@ -54,18 +54,15 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
-            case "reload" -> {
-                if (!sender.hasPermission("afkzone.reload")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                plugin.reloadConfig();
-                rewardManager.loadRewards();
-                rewardManager.loadGlobalConfig();
-                zoneManager.reload();
-                msg(sender, "<green>AfkZone configuration reloaded.</green>");
-                return true;
-            }
+        case "reload" -> {
+    if (!sender.hasPermission("afkzone.reload")) {
+        msg(sender, "<red>You don't have permission.</red>");
+        return true;
+    }
+    plugin.reloadAll();
+    msg(sender, "<green>ThunderAfkZone configuration reloaded (config + zones + particles).</green>");
+    return true;
+}
             case "reward" -> {
                 return handleRewardCommand(sender, args);
             }
