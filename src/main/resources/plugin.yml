@@ -1,5 +1,5 @@
 name: ThunderAfkZone
-version: 2.0.0
+version: 1.0.0
 main: me.ehsan.afkzone.Main
 api-version: "1.21"
 softdepend: [WorldEdit, ItemEdit, PlaceholderAPI]
