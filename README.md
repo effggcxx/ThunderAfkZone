@@ -142,6 +142,15 @@ set above `0`, or it can never fire. `priority` only matters if
 - `itemedit` → `/si give <player> <item> <amount>` (item must already be saved in ItemEdit under that exact name)
 - `console` → runs the string in `command:`, with `{player}` substituted
 
+**Leaving a zone resets reward progress by default.** Interval/once-after
+counters restart from zero every time a player leaves and re-enters, even a
+couple of seconds later. If that's too punishing for your setup, set
+`global.reset_progress_on_leave: false` in `config.yml` to keep progress
+in memory across zone visits (a full restart still clears it). Note that the
+current-session timer (`%afkzone_time%`, and the "Current session" line in
+`/afkzone stats`) always resets on leaving regardless of this setting — it's
+tracking time in the zone right now, not reward progress.
+
 ## Zones and per-zone options (`zones.yml`)
 
 Zones are created via `/afkzone create`, but you can also hand-edit `zones.yml`.

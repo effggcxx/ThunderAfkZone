@@ -34,6 +34,7 @@ public class RewardManager {
 
     private String onMultiple = "all";
     private int afkThresholdSeconds = 60;
+    private boolean resetProgressOnLeave = true;
     private Sound enterSound = null;
     private Sound exitSound = null;
     private Sound rewardSound = null;
@@ -100,6 +101,7 @@ public class RewardManager {
 
         this.onMultiple = cfg.getString("global.on_multiple", "all");
         this.afkThresholdSeconds = cfg.getInt("global.afk_threshold_seconds", 60);
+        this.resetProgressOnLeave = cfg.getBoolean("global.reset_progress_on_leave", true);
         this.enterSound = MessageUtils.parseSound(cfg.getString("global.enter_sound", "ENTITY_PLAYER_LEVELUP"),
                 plugin.getLogger(), "global.enter_sound");
         this.exitSound = MessageUtils.parseSound(cfg.getString("global.exit_sound", "ENTITY_ITEM_BREAK"),
@@ -173,7 +175,7 @@ public class RewardManager {
     private void tickOnePlayer(UUID id) {
         Player player = Bukkit.getPlayer(id);
         if (player == null || !player.isOnline()) {
-            playerTracker.stopTrackingSilent(id);
+            playerTracker.stopTrackingSilent(id, resetProgressOnLeave);
             timerService.removePlayer(player);
             return;
         }
@@ -185,7 +187,7 @@ public class RewardManager {
         String currentZone = zoneService.findZoneForLocation(player.getLocation());
         if (currentZone == null || !currentZone.equals(zoneName)) {
             Sound effectiveExitSound = resolveZoneSound(zoneName, "exit_sound", exitSound);
-            playerTracker.stopTracking(id, msgExitZone, effectiveExitSound, soundVolume, soundPitch);
+            playerTracker.stopTracking(id, msgExitZone, effectiveExitSound, soundVolume, soundPitch, resetProgressOnLeave);
             timerService.removePlayer(player);
             executeExitCommands(player, zoneName);
             return;
@@ -267,7 +269,7 @@ public class RewardManager {
 
     public void startTrackingPlayer(Player player, String zoneName) {
         Sound effectiveEnterSound = resolveZoneSound(zoneName, "enter_sound", enterSound);
-        playerTracker.startTracking(player, zoneName, effectiveEnterSound, soundVolume, soundPitch, msgEnterZone);
+        playerTracker.startTracking(player, zoneName, effectiveEnterSound, soundVolume, soundPitch, msgEnterZone, resetProgressOnLeave);
         executeEntryCommands(player, zoneName);
     }
 
@@ -275,7 +277,7 @@ public class RewardManager {
         Player player = Bukkit.getPlayer(id);
         String zone = playerTracker.getPlayerZone(id);
         Sound effectiveExitSound = resolveZoneSound(zone, "exit_sound", exitSound);
-        playerTracker.stopTracking(id, msgExitZone, effectiveExitSound, soundVolume, soundPitch);
+        playerTracker.stopTracking(id, msgExitZone, effectiveExitSound, soundVolume, soundPitch, resetProgressOnLeave);
         timerService.removePlayer(player);
         if (player != null && zone != null) {
             executeExitCommands(player, zone);

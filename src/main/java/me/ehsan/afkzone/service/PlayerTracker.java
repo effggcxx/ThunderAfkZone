@@ -42,17 +42,20 @@ public class PlayerTracker {
     }
 
     public void startTracking(Player player, String zoneName, Sound enterSound, float soundVolume, float soundPitch,
-                              String msgEnterZone) {
+                              String msgEnterZone, boolean resetProgress) {
         UUID id = player.getUniqueId();
 
         // If already tracking a different zone, clean up first
         if (playerZone.containsKey(id)) {
-            stopTracking(id, null, null, 0, 0);
+            stopTracking(id, null, null, 0, 0, resetProgress);
         }
 
         playerZone.put(id, zoneName);
-        playerProgress.put(id, new ConcurrentHashMap<>());
-        playerGivenOnce.put(id, ConcurrentHashMap.newKeySet());
+        // computeIfAbsent, not put: if progress was preserved from a previous
+        // session (reset_progress_on_leave: false in config.yml), reuse it
+        // instead of wiping it back to empty on re-entry.
+        playerProgress.computeIfAbsent(id, k -> new ConcurrentHashMap<>());
+        playerGivenOnce.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
         sessionAfkSeconds.put(id, 0);
         // Treat join as active so the AFK threshold has to pass before rewards start
         lastActive.put(id, System.currentTimeMillis());
@@ -61,9 +64,12 @@ public class PlayerTracker {
         MessageUtils.playSound(player, enterSound, soundVolume, soundPitch);
     }
 
-    public void stopTracking(UUID id, String msgExitZone, Sound exitSound, float soundVolume, float soundPitch) {
-        playerProgress.remove(id);
-        playerGivenOnce.remove(id);
+    public void stopTracking(UUID id, String msgExitZone, Sound exitSound, float soundVolume, float soundPitch,
+                              boolean resetProgress) {
+        if (resetProgress) {
+            playerProgress.remove(id);
+            playerGivenOnce.remove(id);
+        }
         String zone = playerZone.remove(id);
         lastActive.remove(id);
         sessionAfkSeconds.remove(id);
@@ -77,9 +83,11 @@ public class PlayerTracker {
         }
     }
 
-    public void stopTrackingSilent(UUID id) {
-        playerProgress.remove(id);
-        playerGivenOnce.remove(id);
+    public void stopTrackingSilent(UUID id, boolean resetProgress) {
+        if (resetProgress) {
+            playerProgress.remove(id);
+            playerGivenOnce.remove(id);
+        }
         playerZone.remove(id);
         lastActive.remove(id);
         sessionAfkSeconds.remove(id);

@@ -33,6 +33,23 @@ global:
   # Seconds of inactivity before a player is considered AFK (rewards only tick while AFK)
   afk_threshold_seconds: 60
 
+  # Whether leaving a zone resets progress toward interval/once-after rewards.
+  #   true  (default) - leaving (even briefly) resets all reward progress back
+  #                      to zero, same as re-entering fresh. The current-session
+  #                      timer (%afkzone_time%) always resets regardless of
+  #                      this setting - it's tracking "time in the zone right
+  #                      now", not reward progress.
+  #   false            - reward progress (interval counters and which
+  #                       once-after rewards have already been given) is kept
+  #                       when a player leaves and picked back up if/when they
+  #                       return, instead of restarting every timer from zero.
+  #                       Useful if players commonly get bumped out briefly
+  #                       (server hiccups, accidental steps out of the zone)
+  #                       and losing all progress each time feels punishing.
+  #                       Progress is only held in memory - a full server
+  #                       restart still clears it either way.
+  reset_progress_on_leave: true
+
   # Storage backend: "sqlite" (persistent) or "memory" (resets on restart).
   # "sqlite" requires the driver declared in plugin.yml's `libraries:` block -
   # check your startup log for "SQLite storage initialized"; if you see a
