@@ -60,15 +60,15 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
-case "reload" -> {
-    if (!sender.hasPermission("afkzone.reload")) {
-        msg(sender, "<red>You don't have permission.</red>");
-        return true;
-    }
-    plugin.reloadAll();
-    msg(sender, "<green>ThunderAfkZone configuration reloaded (config + zones + particles).</green>");
-    return true;
-}
+            case "reload" -> {
+                if (!sender.hasPermission("afkzone.reload")) {
+                    msg(sender, "<red>You don't have permission.</red>");
+                    return true;
+                }
+                plugin.reloadAll();
+                msg(sender, "<green>ThunderAfkZone configuration reloaded (config + zones + particles).</green>");
+                return true;
+            }
             case "reward" -> {
                 return handleRewardCommand(sender, args);
             }
@@ -304,12 +304,12 @@ case "reload" -> {
                 return true;
             }
             msg(sender, "<yellow>Global rewards:</yellow>");
-for (Reward r : rewardManager.getRewards().values()) {
-    String status = r.isEnabled() ? "<green>enabled</green>" : "<red>disabled</red>";
-    msg(sender, " <gray>- <white>" + r.getName() + "</white> <gray>(" + status
-            + "<gray>, priority=" + r.getPriority()
-            + ") <dark_gray>- " + r.getDescription());
-}
+            for (Reward r : rewardManager.getRewards().values()) {
+                String status = r.isEnabled() ? "<green>enabled</green>" : "<red>disabled</red>";
+                msg(sender, " <gray>- <white>" + r.getName() + "</white> <gray>(" + status
+                        + "<gray>, priority=" + r.getPriority()
+                        + ") <dark_gray>- " + r.getDescription());
+            }
             return true;
         } else if (act.equals("give")) {
             if (!sender.hasPermission("afkzone.reward.give")) {
