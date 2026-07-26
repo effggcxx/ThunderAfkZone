@@ -2,6 +2,7 @@ package me.ehsan.afkzone;
 
 import me.ehsan.afkzone.commands.AfkZoneCommand;
 import me.ehsan.afkzone.listeners.ActivityListener;
+import me.ehsan.afkzone.listeners.WandListener;
 import me.ehsan.afkzone.listeners.ZoneListener;
 import me.ehsan.afkzone.managers.RewardManager;
 import me.ehsan.afkzone.managers.ZoneManager;
@@ -22,6 +23,7 @@ public class Main extends JavaPlugin {
     private RewardDispatcher rewardDispatcher;
     private StorageService storageService;
     private ParticleService particleService;
+    private WandListener wandListener;
     private AfkZoneExpansion placeholderExpansion;
 
     @Override
@@ -56,9 +58,14 @@ public class Main extends JavaPlugin {
         this.particleService = new ParticleService(this, spatialIndex);
         loadParticleConfig();
 
+        // Wand selection system
+        this.wandListener = new WandListener(this);
+        wandListener.loadConfig();
+
         // Register listeners
         getServer().getPluginManager().registerEvents(new ZoneListener(this, zoneManager, rewardManager, particleService), this);
         getServer().getPluginManager().registerEvents(new ActivityListener(rewardManager), this);
+        getServer().getPluginManager().registerEvents(wandListener, this);
 
         // Register command
         if (getCommand("afkzone") != null) {
@@ -84,6 +91,9 @@ public class Main extends JavaPlugin {
         }
         if (particleService != null) {
             particleService.stopAll();
+        }
+        if (wandListener != null) {
+            wandListener.stopAllVisualTasks();
         }
         if (storageService != null) {
             storageService.shutdown();
@@ -160,5 +170,9 @@ public class Main extends JavaPlugin {
 
     public ParticleService getParticleService() {
         return particleService;
+    }
+
+    public WandListener getWandListener() {
+        return wandListener;
     }
 }

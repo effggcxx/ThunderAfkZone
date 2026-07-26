@@ -1,12 +1,5 @@
 package me.ehsan.afkzone.managers;
 
-import com.sk89q.worldedit.LocalSession;
-import com.sk89q.worldedit.WorldEdit;
-import com.sk89q.worldedit.bukkit.BukkitAdapter;
-import com.sk89q.worldedit.bukkit.BukkitPlayer;
-import com.sk89q.worldedit.math.BlockVector3;
-import com.sk89q.worldedit.regions.Region;
-import com.sk89q.worldedit.session.SessionManager;
 import me.ehsan.afkzone.Main;
 import me.ehsan.afkzone.service.SpatialZoneIndex;
 import me.ehsan.afkzone.service.ZoneService;
@@ -147,63 +140,9 @@ public class ZoneManager implements ZoneService {
 
     @Override
     public boolean createZoneFromWorldEditSelection(Player player, String name) {
-        if (plugin.getServer().getPluginManager().getPlugin("WorldEdit") == null) {
-            msg(player, "<red>WorldEdit is not installed on this server.</red>");
-            return false;
-        }
-
-        try {
-            BukkitPlayer wePlayer = BukkitAdapter.adapt(player);
-            SessionManager sessionManager = WorldEdit.getInstance().getSessionManager();
-            LocalSession session = sessionManager.get(wePlayer);
-
-            Region region = session.getSelection(wePlayer.getWorld());
-            if (region == null) {
-                msg(player, "<red>You must make a WorldEdit selection with the wand first.</red>");
-                return false;
-            }
-
-            BlockVector3 min = region.getMinimumPoint();
-            BlockVector3 max = region.getMaximumPoint();
-
-            World world = BukkitAdapter.adapt(region.getWorld());
-            if (world == null) {
-                world = player.getWorld();
-            }
-
-            int x1 = Math.min(min.x(), max.x());
-            int y1 = Math.min(min.y(), max.y());
-            int z1 = Math.min(min.z(), max.z());
-            int x2 = Math.max(min.x(), max.x());
-            int y2 = Math.max(min.y(), max.y());
-            int z2 = Math.max(min.z(), max.z());
-
-            String path = "zones." + name;
-            zonesConfig.set(path + ".world", world.getName());
-            zonesConfig.set(path + ".x1", x1);
-            zonesConfig.set(path + ".y1", y1);
-            zonesConfig.set(path + ".z1", z1);
-            zonesConfig.set(path + ".x2", x2);
-            zonesConfig.set(path + ".y2", y2);
-            zonesConfig.set(path + ".z2", z2);
-            saveZonesFile();
-
-            // Add to spatial index
-            spatialIndex.addZone(name, world.getName(), x1, y1, z1, x2, y2, z2);
-
-            msg(player, "<green>AFK zone '" + name + "' created: " + world.getName()
-                    + " (" + x1 + "," + y1 + "," + z1 + ") -> (" + x2 + "," + y2 + "," + z2 + ")</green>");
-            msg(player, "<gray>Tip: Use <yellow>/afkzone zonereward add " + name + " [reward]</yellow> to restrict rewards for this zone.</gray>");
-            return true;
-
-        } catch (com.sk89q.worldedit.IncompleteRegionException e) {
-            msg(player, "<red>Incomplete WorldEdit selection. Select both corners first.</red>");
-            return false;
-        } catch (Exception e) {
-            msg(player, "<red>Error reading WorldEdit selection: " + e.getMessage() + "</red>");
-            plugin.getLogger().severe("Error reading WorldEdit selection: " + e);
-            return false;
-        }
+        // WorldEdit support removed - use wand selection instead
+        msg(player, "<red>WorldEdit is not supported. Use <yellow>/afkzone wand</yellow> to select a region.</red>");
+        return false;
     }
 
     // --- Per-zone configuration overrides ---

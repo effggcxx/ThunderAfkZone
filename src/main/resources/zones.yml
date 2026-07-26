@@ -6,7 +6,7 @@
 # configured afk_threshold_seconds in config.yml.
 #
 # Create a zone with: /afkzone create <name>
-# (select the region with WorldEdit wand first)
+# (select the region with the wand tool: /afkzone wand)
 #
 # Zone format:
 #   zones:

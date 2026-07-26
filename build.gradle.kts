@@ -8,18 +8,11 @@ version = "1.0.0"
 repositories {
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")
-    maven("https://maven.enginehub.org/repo/")
     maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
 }
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
-    // 7.3.0 only supports Bukkit for MC 1.20-1.20.4 - bumped to the final 7.3.x
-    // release (supports 1.21.4-1.21.11) to actually match paper-api above.
-    // WorldEdit's supported version range shifts almost every MC patch, so
-    // re-check https://hangar.papermc.io/EngineHub/WorldEdit/versions before
-    // targeting a newer Minecraft version than what's declared here.
-    compileOnly("com.sk89q.worldedit:worldedit-bukkit:7.3.19")
     compileOnly("net.kyori:adventure-text-minimessage:4.14.0")
     compileOnly("me.clip:placeholderapi:2.11.6")
     // Matches plugin.yml's `libraries:` entry - Paper downloads this at runtime,

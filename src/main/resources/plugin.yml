@@ -2,7 +2,7 @@ name: ThunderAfkZone
 version: 1.0.0
 main: me.ehsan.afkzone.Main
 api-version: "1.21"
-softdepend: [WorldEdit, ItemEdit, PlaceholderAPI]
+softdepend: [ItemEdit, PlaceholderAPI]
 # Downloaded by Paper at startup and added to the plugin's classpath - required
 # for global.storage: "sqlite" in config.yml to work (SqliteStorage uses this
 # driver via Class.forName("org.sqlite.JDBC")). Without this, SQLite storage
@@ -15,8 +15,11 @@ commands:
     usage: /afkzone <create|list|info|remove|reload|reward|zonereward|stats|top>
     aliases: [taz, thunderafk]
 permissions:
+  afkzone.wand:
+    description: Allows using the AFK zone wand selection tool
+    default: op
   afkzone.create:
-    description: Allows creating AFK zones with a WorldEdit selection
+    description: Allows creating AFK zones with the wand selection tool
     default: op
   afkzone.list:
     description: Allows listing AFK zones
@@ -66,6 +69,7 @@ permissions:
     description: All ThunderAfkZone permissions
     default: op
     children:
+      afkzone.wand: true
       afkzone.create: true
       afkzone.list: true
       afkzone.info: true

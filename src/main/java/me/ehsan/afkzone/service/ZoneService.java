@@ -52,7 +52,7 @@ public interface ZoneService {
     void removeZone(String name);
 
     /**
-     * Creates a zone from the player's WorldEdit selection.
+     * Creates a zone from the player's WorldEdit selection (deprecated - use wand selection instead).
      */
     boolean createZoneFromWorldEditSelection(Player player, String name);
 

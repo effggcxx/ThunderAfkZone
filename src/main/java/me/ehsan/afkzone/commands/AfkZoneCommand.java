@@ -1,19 +1,25 @@
 package me.ehsan.afkzone.commands;
 
 import me.ehsan.afkzone.Main;
+import me.ehsan.afkzone.listeners.WandListener;
 import me.ehsan.afkzone.managers.RewardManager;
 import me.ehsan.afkzone.managers.ZoneManager;
 import me.ehsan.afkzone.models.Reward;
+import me.ehsan.afkzone.models.WandSelection;
 import me.ehsan.afkzone.storage.StorageService;
 import me.ehsan.afkzone.util.MessageUtils;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -27,7 +33,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
     private static final List<String> ROOT_SUBS = Arrays.asList(
-            "create", "list", "info", "remove", "reload", "reward", "zonereward", "stats", "top"
+            "wand", "sel", "create", "list", "info", "remove", "reload", "reward", "zonereward", "stats", "top"
     );
 
     public AfkZoneCommand(Main plugin, ZoneManager zoneManager, RewardManager rewardManager) {
@@ -69,6 +75,42 @@ case "reload" -> {
             case "zonereward" -> {
                 return handleZoneRewardCommand(sender, args);
             }
+            case "wand" -> {
+                if (!(sender instanceof Player player)) {
+                    msg(sender, "<red>Only players can use this command.</red>");
+                    return true;
+                }
+                if (!sender.hasPermission("afkzone.wand")) {
+                    msg(sender, "<red>You don't have permission.</red>");
+                    return true;
+                }
+                giveWand(player);
+                return true;
+            }
+            case "sel", "wandsel" -> {
+                if (!(sender instanceof Player player)) {
+                    msg(sender, "<red>Only players can use this command.</red>");
+                    return true;
+                }
+                if (!sender.hasPermission("afkzone.wand")) {
+                    msg(sender, "<red>You don't have permission.</red>");
+                    return true;
+                }
+                showWandSelection(player);
+                return true;
+            }
+            case "cancel", "wandcancel" -> {
+                if (!(sender instanceof Player player)) {
+                    msg(sender, "<red>Only players can use this command.</red>");
+                    return true;
+                }
+                if (!sender.hasPermission("afkzone.wand")) {
+                    msg(sender, "<red>You don't have permission.</red>");
+                    return true;
+                }
+                cancelWandSelection(player);
+                return true;
+            }
             case "create" -> {
                 if (!(sender instanceof Player player)) {
                     msg(sender, "<red>Only players can create zones.</red>");
@@ -82,7 +124,7 @@ case "reload" -> {
                     msg(sender, "<red>Usage: /afkzone create [name]</red>");
                     return true;
                 }
-                zoneManager.createZoneFromWorldEditSelection(player, args[1]);
+                createZoneFromWandSelection(player, args[1]);
                 return true;
             }
             case "list" -> {
@@ -141,7 +183,10 @@ case "reload" -> {
     }
 
     private void sendUsage(CommandSender sender) {
-        msg(sender, "<yellow>/afkzone create [name] <gray>- create zone from WorldEdit selection</gray></yellow>");
+        msg(sender, "<yellow>/afkzone wand <gray>- get the selection tool (wooden hoe)</gray></yellow>");
+        msg(sender, "<yellow>/afkzone sel <gray>- view current wand selection</gray></yellow>");
+        msg(sender, "<yellow>/afkzone cancel <gray>- clear current wand selection</gray></yellow>");
+        msg(sender, "<yellow>/afkzone create [name] <gray>- create zone from wand selection</gray></yellow>");
         msg(sender, "<yellow>/afkzone list <gray>- list zones</gray></yellow>");
         msg(sender, "<yellow>/afkzone info [name] <gray>- zone details + rewards</gray></yellow>");
         msg(sender, "<yellow>/afkzone remove [name] <gray>- remove a zone</gray></yellow>");
@@ -483,6 +528,146 @@ for (Reward r : rewardManager.getRewards().values()) {
         }
         zoneManager.removeZone(name);
         msg(sender, "<green>Zone '" + name + "' removed.</green>");
+    }
+
+    // -------------------------------------------------------------------------
+    // Wand selection commands
+    // -------------------------------------------------------------------------
+
+    private WandListener getWandListener() {
+        return plugin.getWandListener();
+    }
+
+    private void giveWand(Player player) {
+        Material wandMat = Material.WOODEN_HOE;
+        try {
+            String matName = plugin.getConfig().getString("wand.item", "WOODEN_HOE");
+            wandMat = Material.valueOf(matName.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {}
+
+        ItemStack wand = new ItemStack(wandMat);
+        ItemMeta meta = wand.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName("§6AFK Zone Wand");
+            meta.setLore(Arrays.asList(
+                    "§7Left-click: Set position 1",
+                    "§7Right-click: Set position 2",
+                    "§8/afkzone create [name] to save"
+            ));
+            wand.setItemMeta(meta);
+        }
+        player.getInventory().addItem(wand);
+        msg(player, "<green>You received the AFK Zone Wand!</green>");
+        msg(player, "<gray>Left-click a block to set position 1, right-click to set position 2.</gray>");
+        msg(player, "<gray>Use <yellow>/afkzone create [name]</yellow> to create the zone from your selection.</gray>");
+        msg(player, "<gray>Use <yellow>/afkzone sel</yellow> to view your current selection.</gray>");
+    }
+
+    private void showWandSelection(Player player) {
+        WandListener listener = plugin.getWandListener();
+        if (listener == null) {
+            msg(player, "<red>Wand system is not available.</red>");
+            return;
+        }
+        WandSelection sel = listener.getSelection(player);
+        if (sel.getPos1() == null && sel.getPos2() == null) {
+            msg(player, "<yellow>You have no active wand selection.</yellow>");
+            msg(player, "<gray>Use <yellow>/afkzone wand</yellow> to get the selection tool.</gray>");
+            return;
+        }
+        msg(player, "<yellow>Current wand selection:</yellow>");
+        if (sel.getPos1() != null) {
+            msg(player, "  <green>Position 1:</green> <white>" + formatLoc(sel.getPos1()) + "</white>");
+        } else {
+            msg(player, "  <red>Position 1: not set</red>");
+        }
+        if (sel.getPos2() != null) {
+            msg(player, "  <green>Position 2:</green> <white>" + formatLoc(sel.getPos2()) + "</white>");
+        } else {
+            msg(player, "  <red>Position 2: not set</red>");
+        }
+        if (sel.isComplete()) {
+            msg(player, "  <gray>Size: <white>" + sel.getDimensions() + "</white></gray>");
+            msg(player, "<gray>Use <yellow>/afkzone create [name]</yellow> to save this selection as a zone.</gray>");
+        } else {
+            msg(player, "<gray>Selection incomplete. Use the wand to set both positions.</gray>");
+        }
+    }
+
+    private void cancelWandSelection(Player player) {
+        WandListener listener = plugin.getWandListener();
+        if (listener == null) {
+            msg(player, "<red>Wand system is not available.</red>");
+            return;
+        }
+        listener.clearSelection(player);
+        msg(player, "<yellow>Wand selection cleared.</yellow>");
+    }
+
+    private void createZoneFromWandSelection(Player player, String name) {
+        WandListener listener = plugin.getWandListener();
+        if (listener == null) {
+            msg(player, "<red>Wand system is not available.</red>");
+            return;
+        }
+        WandSelection sel = listener.getSelection(player);
+        if (!sel.isComplete()) {
+            msg(player, "<red>Incomplete selection! Use the wand to select both corners first.</red>");
+            msg(player, "<gray>Use <yellow>/afkzone wand</yellow> to get the selection tool.</gray>");
+            msg(player, "<gray>Left-click = pos1, Right-click = pos2.</gray>");
+            return;
+        }
+
+        Location min = sel.getMin();
+        Location max = sel.getMax();
+        if (min == null || max == null) {
+            msg(player, "<red>Invalid selection bounds.</red>");
+            return;
+        }
+
+        if (name == null || name.trim().isEmpty()) {
+            msg(player, "<red>Zone name cannot be empty.</red>");
+            return;
+        }
+
+        // Check if zone name already exists
+        if (zoneManager.zoneExists(name)) {
+            msg(player, "<red>A zone named '" + name + "' already exists.</red>");
+            return;
+        }
+
+        String worldName = min.getWorld().getName();
+        int x1 = min.getBlockX();
+        int y1 = min.getBlockY();
+        int z1 = min.getBlockZ();
+        int x2 = max.getBlockX();
+        int y2 = max.getBlockY();
+        int z2 = max.getBlockZ();
+
+        var zonesConfig = zoneManager.getZonesConfig();
+        String path = "zones." + name;
+        zonesConfig.set(path + ".world", worldName);
+        zonesConfig.set(path + ".x1", x1);
+        zonesConfig.set(path + ".y1", y1);
+        zonesConfig.set(path + ".z1", z1);
+        zonesConfig.set(path + ".x2", x2);
+        zonesConfig.set(path + ".y2", y2);
+        zonesConfig.set(path + ".z2", z2);
+        zoneManager.saveZonesFile();
+
+        // Add to spatial index
+        zoneManager.getSpatialIndex().addZone(name, worldName, x1, y1, z1, x2, y2, z2);
+
+        msg(player, "<green>AFK zone '" + name + "' created: " + worldName
+                + " (" + x1 + "," + y1 + "," + z1 + ") -> (" + x2 + "," + y2 + "," + z2 + ")</green>");
+        msg(player, "<gray>Tip: Use <yellow>/afkzone zonereward add " + name + " [reward]</yellow> to restrict rewards for this zone.</gray>");
+
+        // Clear the selection after successful creation
+        listener.clearSelection(player);
+    }
+
+    private String formatLoc(Location loc) {
+        return loc.getWorld().getName() + " (" + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ() + ")";
     }
 
     @Override

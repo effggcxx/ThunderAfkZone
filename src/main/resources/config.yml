@@ -2,6 +2,17 @@
 # ThunderAfkZone configuration
 # ============================================================
 
+# Wand selection tool configuration
+wand:
+  # The item used as the selection wand (Bukkit Material enum)
+  item: "WOODEN_HOE"
+  # Visual particles shown around the selected area
+  particles:
+    enabled: true
+    count: 1
+    spacing: 1.5          # blocks between particles
+    type: "END_ROD"       # Bukkit Particle enum
+
 global:
   # When multiple rewards become eligible at the same second:
   #   "all"     → give every eligible reward
