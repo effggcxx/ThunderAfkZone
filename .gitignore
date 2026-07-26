@@ -7,3 +7,6 @@ build/
 *.iml
 .vscode/
 out/
+gradlew.bat
+gradlew
+.gitignore
