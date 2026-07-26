@@ -33,7 +33,10 @@ global:
   # Seconds of inactivity before a player is considered AFK (rewards only tick while AFK)
   afk_threshold_seconds: 60
 
-  # Storage backend: "sqlite" (persistent) or "memory" (resets on restart)
+  # Storage backend: "sqlite" (persistent) or "memory" (resets on restart).
+  # "sqlite" requires the driver declared in plugin.yml's `libraries:` block -
+  # check your startup log for "SQLite storage initialized"; if you see a
+  # failure warning instead, switch this to "memory" until it's resolved.
   storage: "sqlite"
 
   # Sounds (Bukkit Sound enum names). Invalid names are warned on reload and disabled.

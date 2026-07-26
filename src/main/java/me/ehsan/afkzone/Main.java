@@ -35,7 +35,13 @@ public class Main extends JavaPlugin {
         this.playerTracker = new PlayerTracker();
         this.timerService = new TimerService();
 
-        // Storage (SQLite if available, otherwise in-memory)
+        // Storage backend, chosen by global.storage in config.yml (defaults to
+        // "sqlite" here and in the shipped config, matching each other).
+        // This does NOT auto-detect and fall back to memory if the SQLite
+        // driver fails - that failure is handled inside SqliteStorage itself
+        // (degrades to safe no-ops, logs a warning telling the admin to
+        // switch to "memory" manually). Anything other than "sqlite" here
+        // uses MemoryStorage.
         String storageType = getConfig().getString("global.storage", "sqlite");
         if ("sqlite".equalsIgnoreCase(storageType)) {
             this.storageService = new SqliteStorage(this);
