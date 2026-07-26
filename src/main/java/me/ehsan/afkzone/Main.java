@@ -94,71 +94,41 @@ public class Main extends JavaPlugin {
         getLogger().info("ThunderAfkZone disabled");
     }
 
- /**
- * Full reload of config.yml + zones.yml + particles.
- * Storage backend is NOT switched at runtime (requires restart).
- */
-public void reloadAll() {
-    reloadConfig();
-
-    rewardManager.loadRewards();
-    rewardManager.loadGlobalConfig();
-
-    zoneManager.reload();
-
-    loadParticleConfig();
-    if (particleService != null) {
-        particleService.restartAll();
-    }
-}
-
-private void loadParticleConfig() {
-    if (particleService == null) return;
-
-    particleService.setEnabled(getConfig().getBoolean("global.particles.enabled", true));
-    particleService.setParticleCount(getConfig().getInt("global.particles.count", 1));
-    particleService.setParticleSpacing(getConfig().getDouble("global.particles.spacing", 2.0));
-    particleService.setViewDistance(getConfig().getDouble("global.particles.view_distance", 48.0));
-    particleService.setIntervalTicks(getConfig().getInt("global.particles.interval_ticks", 40));
-
-    String typeName = getConfig().getString("global.particles.type", "END_ROD");
-    try {
-        particleService.setParticle(org.bukkit.Particle.valueOf(typeName.toUpperCase(java.util.Locale.ROOT)));
-    } catch (IllegalArgumentException ex) {
-        getLogger().warning("Invalid particle type in config: '" + typeName + "'. Using END_ROD.");
-        particleService.setParticle(org.bukkit.Particle.END_ROD);
-    }
-}
-    // Particle type (optional)
-    String typeName = getConfig().getString("global.particles.type", "END_ROD");
-    try {
-        particleService.setParticle(org.bukkit.Particle.valueOf(typeName.toUpperCase(java.util.Locale.ROOT)));
-    } catch (IllegalArgumentException ex) {
-        getLogger().warning("Invalid particle type in config: '" + typeName + "'. Using END_ROD.");
-        particleService.setParticle(org.bukkit.Particle.END_ROD);
-    }
-}
     /**
- * Full reload of config.yml + zones.yml + particles.
- * Safe to call from /afkzone reload.
- * Note: storage backend is NOT switched at runtime (requires restart).
- */
-public void reloadAll() {
-    reloadConfig();
+     * Full reload of config.yml + zones.yml + particles.
+     * Storage backend is NOT switched at runtime (requires restart).
+     */
+    public void reloadAll() {
+        reloadConfig();
 
-    // Rewards + global settings
-    rewardManager.loadRewards();
-    rewardManager.loadGlobalConfig();
+        rewardManager.loadRewards();
+        rewardManager.loadGlobalConfig();
 
-    // Zones + spatial index
-    zoneManager.reload();
+        zoneManager.reload();
 
-    // Particles
-    loadParticleConfig();
-    if (particleService != null) {
-        particleService.restartAll();   
+        loadParticleConfig();
+        if (particleService != null) {
+            particleService.restartAll();
+        }
     }
-}
+
+    private void loadParticleConfig() {
+        if (particleService == null) return;
+
+        particleService.setEnabled(getConfig().getBoolean("global.particles.enabled", true));
+        particleService.setParticleCount(getConfig().getInt("global.particles.count", 1));
+        particleService.setParticleSpacing(getConfig().getDouble("global.particles.spacing", 2.0));
+        particleService.setViewDistance(getConfig().getDouble("global.particles.view_distance", 48.0));
+        particleService.setIntervalTicks(getConfig().getInt("global.particles.interval_ticks", 40));
+
+        String typeName = getConfig().getString("global.particles.type", "END_ROD");
+        try {
+            particleService.setParticle(org.bukkit.Particle.valueOf(typeName.toUpperCase(java.util.Locale.ROOT)));
+        } catch (IllegalArgumentException ex) {
+            getLogger().warning("Invalid particle type in config: '" + typeName + "'. Using END_ROD.");
+            particleService.setParticle(org.bukkit.Particle.END_ROD);
+        }
+    }
 
     public ZoneManager getZoneManager() {
         return zoneManager;

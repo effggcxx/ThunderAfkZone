@@ -160,36 +160,27 @@ public class ParticleService {
     private static double clamp(double val, double min, double max) {
         return Math.max(min, Math.min(max, val));
     }
-
-  /**
+/**
  * Restarts all active particle tasks so interval/enabled/spacing changes
- * take effect immediately. Call after loadParticleConfig() on reload.
+ * take effect immediately.
  */
 public void restartAll() {
     if (activeTasks.isEmpty()) return;
 
     java.util.Set<UUID> players = new java.util.HashSet<>(activeTasks.keySet());
-    stopAll();
-
-    if (!enabled) return;
-
-    for (UUID id : players) {
-        org.bukkit.entity.Player player = org.bukkit.Bukkit.getPlayer(id);
-        if (player != null && player.isOnline()) {
-            startShowing(player);
 
     // Stop everything
     stopAll();
 
-    // If particles were disabled, just leave them stopped
+    // If particles are disabled, leave them stopped
     if (!enabled) return;
 
-    // Restart for every player that was previously watching
+    // Restart particles for every player that previously had them
     for (UUID id : players) {
         org.bukkit.entity.Player player = org.bukkit.Bukkit.getPlayer(id);
         if (player != null && player.isOnline()) {
             startShowing(player);
         }
     }
-}
+} 
 }
