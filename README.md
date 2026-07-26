@@ -113,7 +113,7 @@ set above `0`, or it can never fire. `priority` only matters if
 `global.on_multiple: "highest"` — otherwise every eligible reward is given.
 
 **Executors:**
-- `give` → `/give <player> <item> <amount>` (vanilla material name, e.g. `diamond`, `iron_sword`)
+- `give` (or `vanilla`) → `/give <player> <item> <amount>` (vanilla material name, e.g. `diamond`, `iron_sword`)
 - `itemedit` → `/si give <player> <item> <amount>` (item must already be saved in ItemEdit under that exact name)
 - `console` → runs the string in `command:`, with `{player}` substituted
 

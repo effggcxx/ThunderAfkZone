@@ -54,9 +54,9 @@ global:
 # Reward definitions
 # ============================================================
 # executor options:
-#   give      → /give <player> <item> <amount>
-#   itemedit  → /si give <player> <item> <amount>   (requires ItemEdit)
-#   console   → run any console command (use the "command:" field)
+#   give / vanilla  → /give <player> <item> <amount>
+#   itemedit        → /si give <player> <item> <amount>   (requires ItemEdit)
+#   console         → run any console command (use the "command:" field)
 #
 # Timing:
 #   interval_seconds   → repeat every X seconds (0 = disabled)

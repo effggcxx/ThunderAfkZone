@@ -68,10 +68,6 @@ public class RewardDispatcher {
                     String dispatch = "si give " + player.getName() + " " + r.getItemName() + " " + r.getAmount();
                     ok = dispatchAndCheck(dispatch, r.getName());
                 }
-                case "item", "itemadder" -> {
-                    String dispatch = "itemadder give " + player.getName() + " " + r.getItemName() + " " + r.getAmount();
-                    ok = dispatchAndCheck(dispatch, r.getName());
-                }
                 case "vanilla", "give" -> {
                     String giveCmd = "give " + player.getName() + " " + r.getItemName() + " " + r.getAmount();
                     ok = dispatchAndCheck(giveCmd, r.getName());
