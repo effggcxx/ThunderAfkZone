@@ -4,7 +4,10 @@ import me.ehsan.afkzone.Main;
 import me.ehsan.afkzone.managers.RewardManager;
 import me.ehsan.afkzone.managers.ZoneManager;
 import me.ehsan.afkzone.models.Reward;
+import me.ehsan.afkzone.storage.StorageService;
+import me.ehsan.afkzone.util.MessageUtils;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -12,11 +15,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class AfkZoneCommand implements CommandExecutor, TabCompleter {
@@ -24,27 +23,20 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
     private final Main plugin;
     private final ZoneManager zoneManager;
     private final RewardManager rewardManager;
+    private final StorageService storageService;
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
     private static final List<String> ROOT_SUBS = Arrays.asList(
-            "create", "list", "info", "remove", "reload", "reward", "zonereward"
+            "create", "list", "info", "remove", "reload", "reward", "zonereward", "stats", "top"
     );
 
     public AfkZoneCommand(Main plugin, ZoneManager zoneManager, RewardManager rewardManager) {
         this.plugin = plugin;
         this.zoneManager = zoneManager;
         this.rewardManager = rewardManager;
+        this.storageService = plugin.getStorageService();
     }
 
-    /**
-     * Sends a MiniMessage-styled message to any CommandSender (players and console
-     * both implement Audience on Paper), keeping admin command output styled the
-     * same way as the player-facing zone/reward messages. Falls back to a
-     * tag-stripped plain message if a value interpolated into the template
-     * (a zone/reward name, an exception message, etc.) happens to contain a
-     * stray '<' that breaks MiniMessage parsing - same defensive pattern
-     * already used in RewardManager.
-     */
     private void msg(CommandSender sender, String miniText) {
         try {
             sender.sendMessage(MM.deserialize(miniText));
@@ -70,7 +62,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 plugin.reloadConfig();
                 rewardManager.loadRewards();
                 rewardManager.loadGlobalConfig();
-                zoneManager.loadZonesFile();
+                zoneManager.reload();
                 msg(sender, "<green>AfkZone configuration reloaded.</green>");
                 return true;
             }
@@ -128,6 +120,22 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 removeZone(sender, args[1]);
                 return true;
             }
+            case "stats" -> {
+                if (!sender.hasPermission("afkzone.stats")) {
+                    msg(sender, "<red>You don't have permission.</red>");
+                    return true;
+                }
+                handleStats(sender, args);
+                return true;
+            }
+            case "top" -> {
+                if (!sender.hasPermission("afkzone.top")) {
+                    msg(sender, "<red>You don't have permission.</red>");
+                    return true;
+                }
+                handleTop(sender, args);
+                return true;
+            }
             default -> {
                 sendUsage(sender);
                 return true;
@@ -143,7 +151,94 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         msg(sender, "<yellow>/afkzone reload <gray>- reload config</gray></yellow>");
         msg(sender, "<yellow>/afkzone reward list|give [reward] [player]</yellow>");
         msg(sender, "<yellow>/afkzone zonereward list|add|remove [zone] [reward]</yellow>");
+        msg(sender, "<yellow>/afkzone stats [player] <gray>- view AFK statistics</gray></yellow>");
+        msg(sender, "<yellow>/afkzone top [time|rewards] <gray>- top players</gray></yellow>");
     }
+
+    // --- Stats ---
+
+    private void handleStats(CommandSender sender, String[] args) {
+        UUID targetId;
+        String targetName;
+
+        if (args.length >= 2) {
+            Player target = Bukkit.getPlayerExact(args[1]);
+            if (target == null) {
+                // Try offline player by name
+                msg(sender, "<red>Player not found: " + args[1] + "</red>");
+                return;
+            }
+            targetId = target.getUniqueId();
+            targetName = target.getName();
+        } else if (sender instanceof Player p) {
+            targetId = p.getUniqueId();
+            targetName = p.getName();
+        } else {
+            msg(sender, "<red>Usage: /afkzone stats [player]</red>");
+            return;
+        }
+
+        long totalAfkTime = storageService.getTotalAfkTime(targetId);
+        int rewardsReceived = storageService.getTotalRewardsReceived(targetId);
+
+        msg(sender, "<yellow>Statistics for <white>" + targetName + "</white>:</yellow>");
+        msg(sender, "  <gray>Total AFK time: <white>" + MessageUtils.formatDuration(totalAfkTime) + "</white></gray>");
+        msg(sender, "  <gray>Rewards received: <white>" + rewardsReceived + "</white></gray>");
+
+        // Show per-zone stats
+        msg(sender, "  <gray>Per-zone AFK time:</gray>");
+        for (String zone : zoneManager.getZoneNames()) {
+            long zoneTime = storageService.getZoneAfkTime(targetId, zone);
+            if (zoneTime > 0) {
+                msg(sender, "   <dark_gray>- <white>" + zone + "</white>: <gray>" + MessageUtils.formatDuration(zoneTime) + "</gray>");
+            }
+        }
+    }
+
+    // --- Top ---
+
+    private void handleTop(CommandSender sender, String[] args) {
+        String type = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "time";
+        int limit = args.length >= 3 ? parseInt(args[2], 10) : 10;
+
+        if ("rewards".equals(type) || "reward".equals(type)) {
+            msg(sender, "<yellow>Top " + limit + " players by rewards received:</yellow>");
+            List<Map.Entry<UUID, Integer>> top = storageService.getTopRewards(limit);
+            int i = 1;
+            for (Map.Entry<UUID, Integer> entry : top) {
+                String name = Bukkit.getOfflinePlayer(entry.getKey()).getName();
+                if (name == null) name = entry.getKey().toString().substring(0, 8) + "...";
+                msg(sender, "  <white>" + i + ".</white> <gray>" + name + "</gray> - <yellow>" + entry.getValue() + "</yellow> rewards");
+                i++;
+            }
+            if (top.isEmpty()) {
+                msg(sender, "  <gray>No data yet.</gray>");
+            }
+        } else {
+            msg(sender, "<yellow>Top " + limit + " players by AFK time:</yellow>");
+            List<Map.Entry<UUID, Long>> top = storageService.getTopAfkTime(limit);
+            int i = 1;
+            for (Map.Entry<UUID, Long> entry : top) {
+                String name = Bukkit.getOfflinePlayer(entry.getKey()).getName();
+                if (name == null) name = entry.getKey().toString().substring(0, 8) + "...";
+                msg(sender, "  <white>" + i + ".</white> <gray>" + name + "</gray> - <yellow>" + MessageUtils.formatDuration(entry.getValue()) + "</yellow>");
+                i++;
+            }
+            if (top.isEmpty()) {
+                msg(sender, "  <gray>No data yet.</gray>");
+            }
+        }
+    }
+
+    private int parseInt(String s, int def) {
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    // --- Reward command ---
 
     private boolean handleRewardCommand(CommandSender sender, String[] args) {
         if (args.length < 2) {
@@ -162,9 +257,9 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             }
             msg(sender, "<yellow>Global rewards:</yellow>");
             for (Reward r : rewardManager.getRewards().values()) {
-                String status = r.enabled ? "<green>enabled</green>" : "<red>disabled</red>";
-                msg(sender, " <gray>- <white>" + r.name + "</white> <gray>(" + status + "<gray>, priority=" + r.priority
-                        + ") <dark_gray>- " + r.description);
+                String status = r.isEnabled() ? "<green>enabled</green>" : "<red>disabled</red>";
+                msg(sender, " <gray>- <white>" + r.getName() + "</white> <gray>(" + status + "<gray>, priority=" + r.getPriority()
+                        + ") <dark_gray>- " + r.getDescription());
             }
             return true;
         } else if (act.equals("give")) {
@@ -196,13 +291,15 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 msg(sender, "<red>No target player specified.</red>");
                 return true;
             }
-            rewardManager.giveRewardToPlayer(r, target);
+            rewardManager.getRewardDispatcher().giveRewardToPlayer(r, target);
             msg(sender, "<green>Gave reward <yellow>" + rewardName + "</yellow> to <yellow>" + target.getName() + "</yellow></green>");
             return true;
         }
         msg(sender, "<red>Usage: /afkzone reward list | give [reward] [player]</red>");
         return true;
     }
+
+    // --- Zone reward command ---
 
     private boolean handleZoneRewardCommand(CommandSender sender, String[] args) {
         if (!sender.hasPermission("afkzone.zonereward")) {
@@ -233,7 +330,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                     msg(sender, "<yellow>Zone <white>" + zone + "</white> rewards:</yellow>");
                     for (String name : assigned) {
                         Reward r = rewardManager.getRewards().get(name);
-                        String status = (r != null && r.enabled) ? "<green>ok</green>" : "<red>missing/disabled</red>";
+                        String status = (r != null && r.isEnabled()) ? "<green>ok</green>" : "<red>missing/disabled</red>";
                         msg(sender, " <gray>- <white>" + name + "</white> <gray>(" + status + "<gray>)");
                     }
                 }
@@ -300,6 +397,8 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    // --- Zone listing ---
+
     private void listZones(CommandSender sender) {
         FileConfiguration zonesConfig = zoneManager.getZonesConfig();
         if (zonesConfig == null || !zonesConfig.isConfigurationSection("zones")) {
@@ -342,12 +441,22 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         msg(sender, "  <gray>Corners: <white>(" + x1 + "," + y1 + "," + z1 + ") -> (" + x2 + "," + y2 + "," + z2 + ")</white></gray>");
         msg(sender, "  <gray>Size: <white>" + (Math.abs(x2 - x1) + 1) + " x " + (Math.abs(y2 - y1) + 1) + " x " + (Math.abs(z2 - z1) + 1) + "</white></gray>");
 
+        // Show entry/exit commands if configured
+        List<String> entryCmds = zoneManager.getZoneEntryCommands(name);
+        if (!entryCmds.isEmpty()) {
+            msg(sender, "  <gray>Entry commands: <white>" + entryCmds.size() + "</white></gray>");
+        }
+        List<String> exitCmds = zoneManager.getZoneExitCommands(name);
+        if (!exitCmds.isEmpty()) {
+            msg(sender, "  <gray>Exit commands: <white>" + exitCmds.size() + "</white></gray>");
+        }
+
         List<String> assigned = zoneManager.getZoneRewards(name);
         if (assigned.isEmpty()) {
             msg(sender, "  <gray>Rewards: <green>all enabled global rewards</green></gray>");
             for (Reward r : rewardManager.getRewards().values()) {
-                if (!r.enabled) continue;
-                msg(sender, "   <dark_gray>- <white>" + r.name + "</white> <gray>(priority=" + r.priority + ")</gray>");
+                if (!r.isEnabled()) continue;
+                msg(sender, "   <dark_gray>- <white>" + r.getName() + "</white> <gray>(priority=" + r.getPriority() + ")</gray>");
             }
         } else {
             msg(sender, "  <gray>Rewards (<white>" + assigned.size() + "</white> assigned):</gray>");
@@ -356,8 +465,8 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 if (r == null) {
                     msg(sender, "   <dark_gray>- <red>" + rn + "</red> <gray>(missing from config!)</gray>");
                 } else {
-                    String status = r.enabled ? "<green>enabled</green>" : "<red>disabled</red>";
-                    msg(sender, "   <dark_gray>- <white>" + rn + "</white> <gray>(" + status + "<gray>, priority=" + r.priority + ")");
+                    String status = r.isEnabled() ? "<green>enabled</green>" : "<red>disabled</red>";
+                    msg(sender, "   <dark_gray>- <white>" + rn + "</white> <gray>(" + status + "<gray>, priority=" + r.getPriority() + ")");
                 }
             }
         }
@@ -390,6 +499,9 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 }
                 case "zonereward" -> {
                     return filter(Arrays.asList("list", "add", "remove", "clear"), args[1]);
+                }
+                case "top" -> {
+                    return filter(Arrays.asList("time", "rewards"), args[1]);
                 }
                 default -> {
                     return Collections.emptyList();

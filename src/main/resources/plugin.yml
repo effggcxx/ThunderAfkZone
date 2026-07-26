@@ -1,12 +1,12 @@
 name: ThunderAfkZone
-version: 1.0.0
+version: 2.0.0
 main: me.ehsan.afkzone.Main
 api-version: "1.21"
-softdepend: [WorldEdit, ItemEdit]
+softdepend: [WorldEdit, ItemEdit, PlaceholderAPI]
 commands:
   afkzone:
     description: Manage AFK zones
-    usage: /afkzone <create|list|info|remove|reload|reward|zonereward>
+    usage: /afkzone <create|list|info|remove|reload|reward|zonereward|stats|top>
     aliases: [taz, thunderafk]
 permissions:
   afkzone.create:
@@ -50,3 +50,23 @@ permissions:
       afkzone.zonereward.add: true
       afkzone.zonereward.remove: true
       afkzone.zonereward.clear: true
+  afkzone.stats:
+    description: Allows viewing AFK statistics
+    default: op
+  afkzone.top:
+    description: Allows viewing top AFK players
+    default: op
+  afkzone.admin:
+    description: All ThunderAfkZone permissions
+    default: op
+    children:
+      afkzone.create: true
+      afkzone.list: true
+      afkzone.info: true
+      afkzone.remove: true
+      afkzone.reload: true
+      afkzone.reward.list: true
+      afkzone.reward.give: true
+      afkzone.zonereward: true
+      afkzone.stats: true
+      afkzone.top: true

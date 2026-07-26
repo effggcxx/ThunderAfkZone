@@ -119,4 +119,17 @@ public final class MessageUtils {
             return null;
         }
     }
+
+    /**
+     * Formats a duration in seconds to a human-readable string (e.g. "5:30", "45s").
+     */
+    public static String formatDuration(long seconds) {
+        if (seconds <= 0) return "0s";
+        if (seconds >= 60) {
+            long mins = seconds / 60;
+            long secs = seconds % 60;
+            return mins + ":" + String.format("%02d", secs);
+        }
+        return seconds + "s";
+    }
 }

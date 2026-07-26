@@ -1,6 +1,10 @@
 # ThunderAfkZone configuration
+# config-version: 2
 
 global:
+  # Storage backend: "sqlite" (persistent) or "memory" (lost on restart)
+  storage: "sqlite"
+
   # When multiple rewards are eligible at the same moment:
   # "all"     - give every eligible reward
   # "highest" - give only the reward(s) with the highest priority
@@ -28,6 +32,20 @@ global:
       fade_in: 5
       stay: 40
       fade_out: 5
+
+  # Visual zone boundary particles
+  particles:
+    enabled: true
+    # Particle type (Bukkit Particle enum)
+    type: "END_ROD"
+    # Number of particles per point
+    count: 1
+    # Spacing between particles along edges (blocks)
+    spacing: 2.0
+    # Max distance from player to show particles
+    view_distance: 48.0
+    # How often to refresh particles (ticks, 20 = 1 second)
+    interval_ticks: 40
 
   # Player-facing messages (MiniMessage). Placeholders: <zone>, <reward>, <timer>, <player>
   messages:
