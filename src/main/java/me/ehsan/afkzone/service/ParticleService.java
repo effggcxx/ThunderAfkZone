@@ -160,4 +160,30 @@ public class ParticleService {
     private static double clamp(double val, double min, double max) {
         return Math.max(min, Math.min(max, val));
     }
+
+    /**
+ * Restarts all active particle tasks so that changes to
+ * interval_ticks / enabled / spacing etc. take effect immediately.
+ * Call this after loadParticleConfig() during /afkzone reload.
+ */
+public void restartAll() {
+    if (activeTasks.isEmpty()) return;
+
+    // Snapshot the players who currently have particles
+    java.util.Set<UUID> players = new java.util.HashSet<>(activeTasks.keySet());
+
+    // Stop everything
+    stopAll();
+
+    // If particles were disabled, just leave them stopped
+    if (!enabled) return;
+
+    // Restart for every player that was previously watching
+    for (UUID id : players) {
+        org.bukkit.entity.Player player = org.bukkit.Bukkit.getPlayer(id);
+        if (player != null && player.isOnline()) {
+            startShowing(player);
+        }
+    }
+}
 }

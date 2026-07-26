@@ -120,7 +120,7 @@ public class Main extends JavaPlugin {
 public void reloadAll() {
     reloadConfig();
 
-    // Rewards + global settings (sounds, timer, messages, threshold, etc.)
+    // Rewards + global settings
     rewardManager.loadRewards();
     rewardManager.loadGlobalConfig();
 
@@ -129,6 +129,9 @@ public void reloadAll() {
 
     // Particles
     loadParticleConfig();
+    if (particleService != null) {
+        particleService.restartAll();   
+    }
 }
 
     public ZoneManager getZoneManager() {
