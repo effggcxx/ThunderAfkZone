@@ -3,6 +3,12 @@ version: 2.0.0
 main: me.ehsan.afkzone.Main
 api-version: "1.21"
 softdepend: [WorldEdit, ItemEdit, PlaceholderAPI]
+# Downloaded by Paper at startup and added to the plugin's classpath - required
+# for global.storage: "sqlite" in config.yml to work (SqliteStorage uses this
+# driver via Class.forName("org.sqlite.JDBC")). Without this, SQLite storage
+# silently fails to initialize and every AFK tick throws on the null connection.
+libraries:
+  - org.xerial:sqlite-jdbc:3.46.1.0
 commands:
   afkzone:
     description: Manage AFK zones

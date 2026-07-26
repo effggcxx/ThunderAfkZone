@@ -17,6 +17,9 @@ dependencies {
     compileOnly("com.sk89q.worldedit:worldedit-bukkit:7.3.0")
     compileOnly("net.kyori:adventure-text-minimessage:4.14.0")
     compileOnly("me.clip:placeholderapi:2.11.6")
+    // Matches plugin.yml's `libraries:` entry - Paper downloads this at runtime,
+    // we only need it here for compilation.
+    compileOnly("org.xerial:sqlite-jdbc:3.46.1.0")
 }
 
 java {

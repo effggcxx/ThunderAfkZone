@@ -160,78 +160,94 @@ public class RewardManager {
         List<UUID> ids = new ArrayList<>(tracked.keySet());
 
         for (UUID id : ids) {
-            Player player = Bukkit.getPlayer(id);
-            if (player == null || !player.isOnline()) {
-                playerTracker.stopTrackingSilent(id);
-                timerService.removePlayer(player);
-                continue;
+            try {
+                tickOnePlayer(id);
+            } catch (Exception ex) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Error ticking AFK player " + id + " - skipping this player for this tick, others unaffected", ex);
             }
+        }
+    }
 
-            String zoneName = playerTracker.getPlayerZone(id);
-            if (zoneName == null) continue;
+    private void tickOnePlayer(UUID id) {
+        Player player = Bukkit.getPlayer(id);
+        if (player == null || !player.isOnline()) {
+            playerTracker.stopTrackingSilent(id);
+            timerService.removePlayer(player);
+            return;
+        }
 
-            // Verify player is still inside the zone
-            String currentZone = zoneService.findZoneForLocation(player.getLocation());
-            if (currentZone == null || !currentZone.equals(zoneName)) {
-                playerTracker.stopTracking(id, msgExitZone, exitSound, soundVolume, soundPitch);
-                timerService.removePlayer(player);
-                executeExitCommands(player, zoneName);
-                continue;
-            }
+        String zoneName = playerTracker.getPlayerZone(id);
+        if (zoneName == null) return;
 
-            // Only count time if the player is considered AFK
-            long last = playerTracker.getLastActiveTime(id);
-            if ((System.currentTimeMillis() - last) < (afkThresholdSeconds * 1000L)) {
-                continue;
-            }
+        // Verify player is still inside the zone
+        String currentZone = zoneService.findZoneForLocation(player.getLocation());
+        if (currentZone == null || !currentZone.equals(zoneName)) {
+            playerTracker.stopTracking(id, msgExitZone, exitSound, soundVolume, soundPitch);
+            timerService.removePlayer(player);
+            executeExitCommands(player, zoneName);
+            return;
+        }
 
-            Map<String, Integer> prog = playerTracker.getProgress(id);
-            Set<String> given = playerTracker.getGivenOnce(id);
+        // Only count time if the player is considered AFK
+        long last = playerTracker.getLastActiveTime(id);
+        if ((System.currentTimeMillis() - last) < (afkThresholdSeconds * 1000L)) {
+            return;
+        }
 
-            // Rewards active for this zone (empty list = all global rewards)
-            List<Reward> zoneRewards = getRewardsForZone(zoneName);
+        Map<String, Integer> prog = playerTracker.getProgress(id);
+        Set<String> given = playerTracker.getGivenOnce(id);
 
-            // Increment progress only for rewards that apply to this zone
-            for (Reward r : zoneRewards) {
-                if (!r.isEnabled()) continue;
-                prog.merge(r.getName(), 1, Integer::sum);
-            }
+        // Rewards active for this zone (empty list = all global rewards)
+        List<Reward> zoneRewards = getRewardsForZone(zoneName);
 
-            // Track AFK time in storage
+        // Increment progress only for rewards that apply to this zone
+        for (Reward r : zoneRewards) {
+            if (!r.isEnabled()) continue;
+            prog.merge(r.getName(), 1, Integer::sum);
+        }
+
+        // Track AFK time in storage. Wrapped separately so a storage failure
+        // (e.g. SQLite driver missing) can't block reward delivery below -
+        // stats are best-effort, rewards are the core mechanic.
+        try {
             storageService.addAfkTime(id, 1);
             storageService.addZoneAfkTime(id, zoneName, 1);
+        } catch (Exception ex) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "Storage error tracking AFK time for " + id + " - continuing without stats for this tick", ex);
+        }
 
-            // Collect due rewards
-            Set<Reward> due = new HashSet<>();
-            for (Reward r : zoneRewards) {
-                if (!r.isEnabled()) continue;
-                int t = prog.getOrDefault(r.getName(), 0);
-                if (r.getOnceAfterSeconds() > 0 && !given.contains(r.getName()) && t >= r.getOnceAfterSeconds()) {
-                    due.add(r);
-                }
-                if (r.getIntervalSeconds() > 0 && t > 0 && t % r.getIntervalSeconds() == 0) {
-                    due.add(r);
+        // Collect due rewards
+        Set<Reward> due = new HashSet<>();
+        for (Reward r : zoneRewards) {
+            if (!r.isEnabled()) continue;
+            int t = prog.getOrDefault(r.getName(), 0);
+            if (r.getOnceAfterSeconds() > 0 && !given.contains(r.getName()) && t >= r.getOnceAfterSeconds()) {
+                due.add(r);
+            }
+            if (r.getIntervalSeconds() > 0 && t > 0 && t % r.getIntervalSeconds() == 0) {
+                due.add(r);
+            }
+        }
+
+        if (!due.isEmpty()) {
+            if ("highest".equalsIgnoreCase(onMultiple)) {
+                int max = due.stream().mapToInt(Reward::getPriority).max().orElse(Integer.MIN_VALUE);
+                due = due.stream().filter(x -> x.getPriority() == max).collect(Collectors.toSet());
+            }
+            for (Reward r : due) {
+                rewardDispatcher.giveRewardToPlayer(r, player);
+                if (r.getOnceAfterSeconds() > 0) {
+                    given.add(r.getName());
                 }
             }
+        }
 
-            if (!due.isEmpty()) {
-                if ("highest".equalsIgnoreCase(onMultiple)) {
-                    int max = due.stream().mapToInt(Reward::getPriority).max().orElse(Integer.MIN_VALUE);
-                    due = due.stream().filter(x -> x.getPriority() == max).collect(Collectors.toSet());
-                }
-                for (Reward r : due) {
-                    rewardDispatcher.giveRewardToPlayer(r, player);
-                    if (r.getOnceAfterSeconds() > 0) {
-                        given.add(r.getName());
-                    }
-                }
-            }
-
-            // Update timer display (only considering zone rewards)
-            NextRewardInfo info = getNearestReward(prog, given, zoneRewards);
-            if (info.getRemainingSeconds() > 0) {
-                timerService.sendTimer(player, info.getRemainingSeconds(), info.getTotalSeconds(), zoneName);
-            }
+        // Update timer display (only considering zone rewards)
+        NextRewardInfo info = getNearestReward(prog, given, zoneRewards);
+        if (info.getRemainingSeconds() > 0) {
+            timerService.sendTimer(player, info.getRemainingSeconds(), info.getTotalSeconds(), zoneName);
         }
     }
 

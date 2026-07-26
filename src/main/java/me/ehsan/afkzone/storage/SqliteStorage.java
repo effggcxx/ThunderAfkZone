@@ -5,12 +5,18 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 
 /**
  * SQLite-based persistent storage for statistics.
+ *
+ * Requires the org.xerial:sqlite-jdbc driver to be present on the classpath
+ * (declared as a Paper `libraries:` entry in plugin.yml). If the driver can't
+ * be loaded or the connection can't be opened, every method here degrades to
+ * a safe no-op/default value instead of throwing - a failed connection used
+ * to cause a NullPointerException on the first call, which escaped the
+ * per-tick loop in RewardManager and silently broke reward delivery for
+ * every tracked player, not just this one.
  */
 public class SqliteStorage implements StorageService {
 
@@ -21,6 +27,15 @@ public class SqliteStorage implements StorageService {
     public SqliteStorage(JavaPlugin plugin) {
         this.plugin = plugin;
         this.dbFile = new File(plugin.getDataFolder(), "afkzone.db");
+    }
+
+    /**
+     * True once a live connection was established. Every read/write method
+     * checks this first and no-ops if false, so a failed driver/connection
+     * never throws a NullPointerException up into the caller.
+     */
+    private boolean isReady() {
+        return connection != null;
     }
 
     @Override
@@ -49,14 +64,21 @@ public class SqliteStorage implements StorageService {
             }
             plugin.getLogger().info("SQLite storage initialized: " + dbFile.getName());
         } catch (Exception e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to initialize SQLite storage", e);
+            connection = null;
+            plugin.getLogger().log(Level.SEVERE,
+                "Failed to initialize SQLite storage - falling back to no-op storage. " +
+                "AFK time and reward counts will NOT be tracked until this is fixed " +
+                "(check that plugin.yml's `libraries:` entry for sqlite-jdbc loaded correctly). " +
+                "Set global.storage: \"memory\" in config.yml for a working non-persistent fallback.",
+                e);
         }
     }
 
     @Override
     public void shutdown() {
+        if (!isReady()) return;
         try {
-            if (connection != null && !connection.isClosed()) {
+            if (!connection.isClosed()) {
                 connection.close();
             }
         } catch (SQLException e) {
@@ -66,6 +88,7 @@ public class SqliteStorage implements StorageService {
 
     @Override
     public long getTotalAfkTime(UUID playerId) {
+        if (!isReady()) return 0;
         try (PreparedStatement ps = connection.prepareStatement(
                 "SELECT afk_time FROM player_stats WHERE uuid = ?")) {
             ps.setString(1, playerId.toString());
@@ -79,6 +102,7 @@ public class SqliteStorage implements StorageService {
 
     @Override
     public void addAfkTime(UUID playerId, long seconds) {
+        if (!isReady()) return;
         try (PreparedStatement ps = connection.prepareStatement(
                 "INSERT INTO player_stats (uuid, afk_time, rewards_received) VALUES (?, ?, 0) " +
                 "ON CONFLICT(uuid) DO UPDATE SET afk_time = afk_time + ?")) {
@@ -93,6 +117,7 @@ public class SqliteStorage implements StorageService {
 
     @Override
     public int getTotalRewardsReceived(UUID playerId) {
+        if (!isReady()) return 0;
         try (PreparedStatement ps = connection.prepareStatement(
                 "SELECT rewards_received FROM player_stats WHERE uuid = ?")) {
             ps.setString(1, playerId.toString());
@@ -106,6 +131,7 @@ public class SqliteStorage implements StorageService {
 
     @Override
     public void incrementRewardsReceived(UUID playerId) {
+        if (!isReady()) return;
         try (PreparedStatement ps = connection.prepareStatement(
                 "INSERT INTO player_stats (uuid, afk_time, rewards_received) VALUES (?, 0, 1) " +
                 "ON CONFLICT(uuid) DO UPDATE SET rewards_received = rewards_received + 1")) {
@@ -118,6 +144,7 @@ public class SqliteStorage implements StorageService {
 
     @Override
     public long getZoneAfkTime(UUID playerId, String zoneName) {
+        if (!isReady()) return 0;
         try (PreparedStatement ps = connection.prepareStatement(
                 "SELECT afk_time FROM zone_stats WHERE uuid = ? AND zone_name = ?")) {
             ps.setString(1, playerId.toString());
@@ -132,6 +159,7 @@ public class SqliteStorage implements StorageService {
 
     @Override
     public void addZoneAfkTime(UUID playerId, String zoneName, long seconds) {
+        if (!isReady()) return;
         try (PreparedStatement ps = connection.prepareStatement(
                 "INSERT INTO zone_stats (uuid, zone_name, afk_time) VALUES (?, ?, ?) " +
                 "ON CONFLICT(uuid, zone_name) DO UPDATE SET afk_time = afk_time + ?")) {
@@ -148,6 +176,7 @@ public class SqliteStorage implements StorageService {
     @Override
     public List<Map.Entry<UUID, Long>> getTopAfkTime(int limit) {
         List<Map.Entry<UUID, Long>> results = new ArrayList<>();
+        if (!isReady()) return results;
         try (PreparedStatement ps = connection.prepareStatement(
                 "SELECT uuid, afk_time FROM player_stats ORDER BY afk_time DESC LIMIT ?")) {
             ps.setInt(1, limit);
@@ -166,6 +195,7 @@ public class SqliteStorage implements StorageService {
     @Override
     public List<Map.Entry<UUID, Integer>> getTopRewards(int limit) {
         List<Map.Entry<UUID, Integer>> results = new ArrayList<>();
+        if (!isReady()) return results;
         try (PreparedStatement ps = connection.prepareStatement(
                 "SELECT uuid, rewards_received FROM player_stats ORDER BY rewards_received DESC LIMIT ?")) {
             ps.setInt(1, limit);
@@ -183,6 +213,7 @@ public class SqliteStorage implements StorageService {
 
     @Override
     public boolean isPersistent() {
-        return true;
+        // Only truly persistent if a live connection was actually established.
+        return isReady();
     }
 }

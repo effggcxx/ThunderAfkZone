@@ -3,7 +3,12 @@
 
 global:
   # Storage backend: "sqlite" (persistent) or "memory" (lost on restart)
-  storage: "sqlite"
+  # "sqlite" requires the org.xerial:sqlite-jdbc library declared in plugin.yml's
+  # `libraries:` block (Paper downloads it automatically on startup). Only switch
+  # to "sqlite" after confirming your server log shows "SQLite storage initialized"
+  # on startup - if that driver can't load, every AFK tick will fail silently and
+  # no rewards will be given. "memory" always works, just doesn't persist restarts.
+  storage: "memory"
 
   # When multiple rewards are eligible at the same moment:
   # "all"     - give every eligible reward
