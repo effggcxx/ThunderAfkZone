@@ -30,7 +30,7 @@ and per zone.
 | Dependency | Required? | Notes |
 |---|---|---|
 | Paper 1.21+ | Yes | Built against `paper-api:1.21.8` |
-| WorldEdit | Yes | Used to select zone corners (`/afkzone create`) |
+| WorldEdit | Yes | Used to select zone corners (`/afkzone create`). **Version matters** - WorldEdit ships Minecraft-patch-specific builds, and its supported range shifts almost every patch. Install whichever WorldEdit build officially supports your server's exact Minecraft version (check [Hangar](https://hangar.papermc.io/EngineHub/WorldEdit/versions)), not necessarily the version pinned in `build.gradle.kts` - that pin is only for compiling against WorldEdit's API, which has stayed stable across the 7.3.x series. |
 | ItemEdit | Only if using `executor: "itemedit"` on a reward | Soft dependency |
 | PlaceholderAPI | Only if you want the placeholders | Soft dependency |
 
