@@ -36,6 +36,7 @@ public class RewardManager {
     private int afkThresholdSeconds = 60;
     private Sound enterSound = null;
     private Sound exitSound = null;
+    private Sound rewardSound = null;
     private float soundVolume = 1.0f;
     private float soundPitch = 1.0f;
 
@@ -120,9 +121,9 @@ public class RewardManager {
         this.msgExitZone = cfg.getString("global.messages.exit_zone", msgExitZone);
 
         // Reward dispatcher config
-        Sound rewardSound = MessageUtils.parseSound(cfg.getString("global.reward_sound", "ENTITY_EXPERIENCE_ORB_PICKUP"),
+        this.rewardSound = MessageUtils.parseSound(cfg.getString("global.reward_sound", "ENTITY_EXPERIENCE_ORB_PICKUP"),
                 plugin.getLogger(), "global.reward_sound");
-        rewardDispatcher.setRewardSound(rewardSound);
+        rewardDispatcher.setRewardSound(this.rewardSound);
         rewardDispatcher.setSoundVolume(this.soundVolume);
         rewardDispatcher.setSoundPitch(this.soundPitch);
         rewardDispatcher.setMsgRewardReceived(cfg.getString("global.messages.reward_received",
@@ -183,15 +184,17 @@ public class RewardManager {
         // Verify player is still inside the zone
         String currentZone = zoneService.findZoneForLocation(player.getLocation());
         if (currentZone == null || !currentZone.equals(zoneName)) {
-            playerTracker.stopTracking(id, msgExitZone, exitSound, soundVolume, soundPitch);
+            Sound effectiveExitSound = resolveZoneSound(zoneName, "exit_sound", exitSound);
+            playerTracker.stopTracking(id, msgExitZone, effectiveExitSound, soundVolume, soundPitch);
             timerService.removePlayer(player);
             executeExitCommands(player, zoneName);
             return;
         }
 
-        // Only count time if the player is considered AFK
+        // Only count time if the player is considered AFK (per-zone override supported)
         long last = playerTracker.getLastActiveTime(id);
-        if ((System.currentTimeMillis() - last) < (afkThresholdSeconds * 1000L)) {
+        int effectiveThreshold = zoneService.getZoneConfigInt(zoneName, "afk_threshold_seconds", afkThresholdSeconds);
+        if ((System.currentTimeMillis() - last) < (effectiveThreshold * 1000L)) {
             return;
         }
 
@@ -241,17 +244,19 @@ public class RewardManager {
                 int max = due.stream().mapToInt(Reward::getPriority).max().orElse(Integer.MIN_VALUE);
                 due = due.stream().filter(x -> x.getPriority() == max).collect(Collectors.toSet());
             }
+            Sound effectiveRewardSound = resolveZoneSound(zoneName, "reward_sound", rewardSound);
             for (Reward r : due) {
-                rewardDispatcher.giveRewardToPlayer(r, player);
+                rewardDispatcher.giveRewardToPlayer(r, player, effectiveRewardSound);
                 if (r.getOnceAfterSeconds() > 0) {
                     given.add(r.getName());
                 }
             }
         }
 
-        // Update timer display (only considering zone rewards)
+        // Update timer display (only considering zone rewards; timer.enabled can be overridden per zone)
+        boolean timerEnabledForZone = zoneService.getZoneConfigBoolean(zoneName, "timer.enabled", timerService.isEnabled());
         NextRewardInfo info = getNearestReward(prog, given, zoneRewards);
-        if (info.getRemainingSeconds() > 0) {
+        if (timerEnabledForZone && info.getRemainingSeconds() > 0) {
             timerService.sendTimer(player, info.getRemainingSeconds(), info.getTotalSeconds(), zoneName);
         }
     }
@@ -261,14 +266,16 @@ public class RewardManager {
     // -------------------------------------------------------------------------
 
     public void startTrackingPlayer(Player player, String zoneName) {
-        playerTracker.startTracking(player, zoneName, enterSound, soundVolume, soundPitch, msgEnterZone);
+        Sound effectiveEnterSound = resolveZoneSound(zoneName, "enter_sound", enterSound);
+        playerTracker.startTracking(player, zoneName, effectiveEnterSound, soundVolume, soundPitch, msgEnterZone);
         executeEntryCommands(player, zoneName);
     }
 
     public void stopTrackingPlayer(UUID id) {
         Player player = Bukkit.getPlayer(id);
         String zone = playerTracker.getPlayerZone(id);
-        playerTracker.stopTracking(id, msgExitZone, exitSound, soundVolume, soundPitch);
+        Sound effectiveExitSound = resolveZoneSound(zone, "exit_sound", exitSound);
+        playerTracker.stopTracking(id, msgExitZone, effectiveExitSound, soundVolume, soundPitch);
         timerService.removePlayer(player);
         if (player != null && zone != null) {
             executeExitCommands(player, zone);
@@ -363,6 +370,25 @@ public class RewardManager {
 
     public void sendExitMessage(Player player, String zoneName) {
         MessageUtils.sendStyled(player, msgExitZone, zoneName, null);
-        MessageUtils.playSound(player, exitSound, soundVolume, soundPitch);
+        MessageUtils.playSound(player, resolveZoneSound(zoneName, "exit_sound", exitSound), soundVolume, soundPitch);
+    }
+
+    // -------------------------------------------------------------------------
+    // Per-zone config override resolution
+    // -------------------------------------------------------------------------
+
+    /**
+     * Resolves a per-zone sound override for the given zones.yml key
+     * (enter_sound / exit_sound / reward_sound). "none" explicitly disables
+     * the sound for that zone; an unset or invalid value falls back to the
+     * global default passed in.
+     */
+    private Sound resolveZoneSound(String zoneName, String key, Sound globalDefault) {
+        if (zoneName == null) return globalDefault;
+        String override = zoneService.getZoneConfigString(zoneName, key, null);
+        if (override == null || override.isBlank()) return globalDefault;
+        if (override.equalsIgnoreCase("none")) return null;
+        Sound parsed = MessageUtils.parseSound(override, plugin.getLogger(), "zones." + zoneName + "." + key);
+        return parsed != null ? parsed : globalDefault;
     }
 }

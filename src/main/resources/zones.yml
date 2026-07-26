@@ -18,10 +18,11 @@
 #         - "reward_name"            # rewards apply in this zone
 #       on_enter:
 #         commands:                  # console commands on zone entry
-#           - "say %player% entered <zone>"
+#           - "say {player} entered {zone}"
 #       on_exit:
 #         commands:                  # console commands on zone exit
-#           - "say %player% left <zone>"
+#           - "say {player} left {zone}"
+#       # Available placeholders in on_enter/on_exit commands: {player} {zone} {uuid}
 #
 # Per-zone config overrides (optional):
 #   These override the matching keys in config.yml for players

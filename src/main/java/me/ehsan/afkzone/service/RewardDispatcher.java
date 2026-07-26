@@ -41,6 +41,16 @@ public class RewardDispatcher {
     // --- Delivery ---
 
     public void giveRewardToPlayer(Reward r, Player player) {
+        giveRewardToPlayer(r, player, this.rewardSound);
+    }
+
+    /**
+     * Same as {@link #giveRewardToPlayer(Reward, Player)} but lets the caller
+     * supply the reward sound to use for this specific delivery - used by
+     * RewardManager to apply a zone's reward_sound override, if any, without
+     * touching the global default stored on this dispatcher.
+     */
+    public void giveRewardToPlayer(Reward r, Player player, Sound effectiveRewardSound) {
         if (r == null || player == null) return;
 
         boolean ok = true;
@@ -80,7 +90,7 @@ public class RewardDispatcher {
 
         if (ok) {
             MessageUtils.sendStyled(player, msgRewardReceived, null, r.getName());
-            MessageUtils.playSound(player, rewardSound, soundVolume, soundPitch);
+            MessageUtils.playSound(player, effectiveRewardSound, soundVolume, soundPitch);
             storageService.incrementRewardsReceived(player.getUniqueId());
         } else {
             MessageUtils.sendStyled(player, msgRewardFailed, null, r.getName());
