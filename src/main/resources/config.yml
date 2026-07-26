@@ -2,15 +2,26 @@
 # ThunderAfkZone configuration
 # ============================================================
 
-# Wand selection tool configuration
+# Wand selection tool - used to define zone boundaries.
+# Get it in-game with /afkzone wand, then:
+#   left-click a block  = set corner 1
+#   right-click a block = set corner 2
+# /afkzone sel shows your current selection; /afkzone create <name> creates
+# the zone from it and clears the selection; /afkzone cancel clears it
+# without creating anything.
+# Only players with the afkzone.wand permission are affected when holding
+# this item - everyone else can use it (e.g. till farmland with a hoe)
+# completely normally.
 wand:
-  # The item used as the selection wand (Bukkit Material enum)
+  # The item used as the selection wand (Bukkit Material enum). Pick
+  # something players don't normally hold if you want to avoid any chance
+  # of confusion, even for staff who forget they're holding it.
   item: "WOODEN_HOE"
-  # Visual particles shown around the selected area
+  # Visual particles shown around the selected area while you're selecting
   particles:
     enabled: true
     count: 1
-    spacing: 1.5          # blocks between particles
+    spacing: 1.5          # blocks between particles along the outline
     type: "END_ROD"       # Bukkit Particle enum
 
 global:

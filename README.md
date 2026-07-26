@@ -1,13 +1,14 @@
 # ThunderAfkZone
 
-A Paper 1.21+ plugin for AFK reward zones: define cuboid regions with WorldEdit,
-give players rewards for staying AFK inside them, and track statistics per player
-and per zone.
+A Paper 1.21+ plugin for AFK reward zones: define cuboid regions with the
+built-in selection wand, give players rewards for staying AFK inside them,
+and track statistics per player and per zone.
 
 ## Features
 
-- **WorldEdit-based zone creation** — select a region with the WorldEdit wand,
-  run one command, done.
+- **Built-in zone selection wand** — no external dependency needed. Left-click
+  sets corner 1, right-click sets corner 2, with a live particle outline of
+  the selection while you work.
 - **Flexible rewards** — repeating (`interval_seconds`) or one-time
   (`once_after_seconds`) rewards, given via vanilla `/give`, ItemEdit, or any
   console command. Toggle rewards on/off without deleting their config.
@@ -30,9 +31,11 @@ and per zone.
 | Dependency | Required? | Notes |
 |---|---|---|
 | Paper 1.21+ | Yes | Built against `paper-api:1.21.8` |
-| WorldEdit | Yes | Used to select zone corners (`/afkzone create`). **Version matters** - WorldEdit ships Minecraft-patch-specific builds, and its supported range shifts almost every patch. Install whichever WorldEdit build officially supports your server's exact Minecraft version (check [Hangar](https://hangar.papermc.io/EngineHub/WorldEdit/versions)), not necessarily the version pinned in `build.gradle.kts` - that pin is only for compiling against WorldEdit's API, which has stayed stable across the 7.3.x series. |
 | ItemEdit | Only if using `executor: "itemedit"` on a reward | Soft dependency |
 | PlaceholderAPI | Only if you want the placeholders | Soft dependency |
+
+No external plugin is needed for zone selection — the wand is built in (see
+below).
 
 If `global.storage: "sqlite"` is set in `config.yml`, the SQLite JDBC driver is
 downloaded automatically by Paper at startup (declared in `plugin.yml`'s
@@ -43,9 +46,27 @@ failed initialization, switch to `storage: "memory"` until it's resolved.
 ## Installation
 
 1. Drop the built jar into your server's `plugins/` folder.
-2. Make sure WorldEdit is installed (required to create zones).
-3. Start the server once to generate `config.yml` and `zones.yml`.
-4. Edit `config.yml` to set up your rewards, then reload or restart.
+2. Start the server once to generate `config.yml` and `zones.yml`.
+3. Edit `config.yml` to set up your rewards, then reload or restart.
+4. Run `/afkzone wand` to get the selection tool and create your first zone
+   (see below).
+
+## Creating a zone with the wand
+
+1. `/afkzone wand` — gives you the selection tool (a wooden hoe by default,
+   configurable via `wand.item` in `config.yml`).
+2. **Left-click** a block to set corner 1, **right-click** another block to
+   set corner 2. A particle outline shows the selection live as you go, and
+   a single point is shown while only one corner is set.
+3. `/afkzone sel` — check your current selection at any time (corners +
+   dimensions), if you want to confirm before creating.
+4. `/afkzone create <name>` — creates the zone from your selection and clears
+   it, ready for the next one.
+5. `/afkzone cancel` — clears your current selection without creating anything.
+
+Only players with `afkzone.wand` permission are affected when holding the
+wand item — everyone else can use a plain wooden hoe (or whatever material
+you've configured) completely normally.
 
 ## Commands
 
@@ -53,7 +74,10 @@ All commands are under `/afkzone` (aliases: `/taz`, `/thunderafk`).
 
 | Command | Description |
 |---|---|
-| `/afkzone create <name>` | Create a zone from your current WorldEdit selection |
+| `/afkzone wand` | Get the selection wand |
+| `/afkzone sel` | Show your current wand selection (corners + dimensions) |
+| `/afkzone cancel` | Clear your current wand selection |
+| `/afkzone create <name>` | Create a zone from your current wand selection |
 | `/afkzone list` | List all configured zones |
 | `/afkzone info <name>` | Show a zone's coordinates and which rewards apply there |
 | `/afkzone remove <name>` | Delete a zone |
@@ -71,6 +95,7 @@ All commands are under `/afkzone` (aliases: `/taz`, `/thunderafk`).
 
 | Permission | Default | Covers |
 |---|---|---|
+| `afkzone.wand` | op | Getting the wand, viewing/clearing a selection |
 | `afkzone.create` | op | Creating zones |
 | `afkzone.list` | op | Listing zones |
 | `afkzone.info` | op | Viewing zone info |
@@ -167,6 +192,23 @@ Requires Java 21.
 ```
 
 The built jar is output to `build/libs/`.
+
+## Wand configuration (`config.yml`)
+
+```yaml
+wand:
+  item: "WOODEN_HOE"       # any Bukkit Material name
+  particles:
+    enabled: true
+    count: 1
+    spacing: 1.5            # blocks between particles along the outline
+    type: "END_ROD"         # any Bukkit Particle name
+```
+
+Changing `wand.item` to something players don't normally hold (an axe or a
+stick, say) avoids any chance of confusion even for staff who forget they're
+holding it. Whatever you pick, only players with `afkzone.wand` are affected
+by clicks with that item - it never touches normal players' tool use.
 
 ## Storage
 

@@ -80,6 +80,12 @@ public class WandListener implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Player player = event.getPlayer();
 
+        // Only intercept clicks for players actually permitted to use the wand -
+        // otherwise this would cancel normal tool use (e.g. tilling farmland)
+        // for any player who happens to be holding the same material, since the
+        // wand defaults to a plain WOODEN_HOE.
+        if (!player.hasPermission("afkzone.wand")) return;
+
         // Check if holding the wand
         if (player.getInventory().getItemInMainHand().getType() != wandMaterial) return;
 

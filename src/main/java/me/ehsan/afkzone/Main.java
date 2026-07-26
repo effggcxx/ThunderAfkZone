@@ -120,6 +120,10 @@ public class Main extends JavaPlugin {
         if (particleService != null) {
             particleService.restartAll();
         }
+
+        if (wandListener != null) {
+            wandListener.loadConfig();
+        }
     }
 
     private void loadParticleConfig() {
