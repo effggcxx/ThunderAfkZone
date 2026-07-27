@@ -66,7 +66,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 plugin.reloadAll();
-                msg(sender, "<green>ThunderAfkZone configuration reloaded (config + zones + particles).</green>");
+                msg(sender, "<green>ThunderAfkZone configuration reloaded (config + zones).</green>");
                 return true;
             }
             case "reward" -> {

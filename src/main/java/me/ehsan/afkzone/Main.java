@@ -6,7 +6,11 @@ import me.ehsan.afkzone.listeners.ZoneListener;
 import me.ehsan.afkzone.managers.RewardManager;
 import me.ehsan.afkzone.managers.ZoneManager;
 import me.ehsan.afkzone.placeholder.AfkZoneExpansion;
-import me.ehsan.afkzone.service.*;
+import me.ehsan.afkzone.service.PlayerTracker;
+import me.ehsan.afkzone.service.RewardDispatcher;
+import me.ehsan.afkzone.service.SpatialZoneIndex;
+import me.ehsan.afkzone.service.TimerService;
+import me.ehsan.afkzone.service.ZoneService;
 import me.ehsan.afkzone.storage.MemoryStorage;
 import me.ehsan.afkzone.storage.SqliteStorage;
 import me.ehsan.afkzone.storage.StorageService;
@@ -21,7 +25,6 @@ public class Main extends JavaPlugin {
     private TimerService timerService;
     private RewardDispatcher rewardDispatcher;
     private StorageService storageService;
-    private ParticleService particleService;
     private WandListener wandListener;
     private AfkZoneExpansion placeholderExpansion;
 
@@ -59,16 +62,12 @@ public class Main extends JavaPlugin {
         // Single global scheduler that ticks all tracked players every second
         rewardManager.startGlobalScheduler();
 
-        // Particle service for visual zone boundaries
-        this.particleService = new ParticleService(this, spatialIndex);
-        loadParticleConfig();
-
         // Wand selection system
         this.wandListener = new WandListener(this);
         wandListener.loadConfig();
 
         // Register listeners
-        getServer().getPluginManager().registerEvents(new ZoneListener(this, zoneManager, rewardManager, particleService), this);
+        getServer().getPluginManager().registerEvents(new ZoneListener(zoneManager, rewardManager), this);
         getServer().getPluginManager().registerEvents(wandListener, this);
 
         // Register command
@@ -93,12 +92,6 @@ public class Main extends JavaPlugin {
         if (rewardManager != null) {
             rewardManager.stopGlobalScheduler();
         }
-        if (particleService != null) {
-            particleService.stopAll();
-        }
-        if (wandListener != null) {
-            wandListener.stopAllVisualTasks();
-        }
         if (storageService != null) {
             storageService.shutdown();
         }
@@ -109,7 +102,7 @@ public class Main extends JavaPlugin {
     }
 
     /**
-     * Full reload of config.yml + zones.yml + particles.
+     * Full reload of config.yml + zones.yml.
      * Storage backend is NOT switched at runtime (requires restart).
      */
     public void reloadAll() {
@@ -120,31 +113,8 @@ public class Main extends JavaPlugin {
 
         zoneManager.reload();
 
-        loadParticleConfig();
-        if (particleService != null) {
-            particleService.restartAll();
-        }
-
         if (wandListener != null) {
             wandListener.loadConfig();
-        }
-    }
-
-    private void loadParticleConfig() {
-        if (particleService == null) return;
-
-        particleService.setEnabled(getConfig().getBoolean("global.particles.enabled", true));
-        particleService.setParticleCount(getConfig().getInt("global.particles.count", 1));
-        particleService.setParticleSpacing(getConfig().getDouble("global.particles.spacing", 2.0));
-        particleService.setViewDistance(getConfig().getDouble("global.particles.view_distance", 48.0));
-        particleService.setIntervalTicks(getConfig().getInt("global.particles.interval_ticks", 40));
-
-        String typeName = getConfig().getString("global.particles.type", "END_ROD");
-        try {
-            particleService.setParticle(org.bukkit.Particle.valueOf(typeName.toUpperCase(java.util.Locale.ROOT)));
-        } catch (IllegalArgumentException ex) {
-            getLogger().warning("Invalid particle type in config: '" + typeName + "'. Using END_ROD.");
-            particleService.setParticle(org.bukkit.Particle.END_ROD);
         }
     }
 
@@ -174,10 +144,6 @@ public class Main extends JavaPlugin {
 
     public StorageService getStorageService() {
         return storageService;
-    }
-
-    public ParticleService getParticleService() {
-        return particleService;
     }
 
     public WandListener getWandListener() {

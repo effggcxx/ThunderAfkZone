@@ -17,13 +17,6 @@ wand:
   # something players don't normally hold if you want to avoid any chance
   # of confusion, even for staff who forget they're holding it.
   item: "WOODEN_HOE"
-  # Visual particles shown around the selected area while you're selecting
-  particles:
-    enabled: true
-    count: 1
-    spacing: 1.5          # blocks between particles along the outline
-    type: "END_ROD"       # Bukkit Particle enum
-
 global:
   # When multiple rewards become eligible at the same second:
   #   "all"     → give every eligible reward
@@ -72,14 +65,6 @@ global:
       fade_in: 5
       stay: 40
       fade_out: 5
-
-  # Visual zone boundary particles (shown to nearby players)
-  particles:
-    enabled: true
-    count: 1
-    spacing: 2.0          # blocks between particles
-    view_distance: 48.0   # how far a player can be and still see them
-    interval_ticks: 40    # how often to redraw (20 ticks = 1 second)
 
   # Player-facing messages (MiniMessage format)
   # Placeholders: <zone>  <reward>  <timer>  <player>
