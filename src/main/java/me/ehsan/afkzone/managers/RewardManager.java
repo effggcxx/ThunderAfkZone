@@ -1,6 +1,7 @@
 package me.ehsan.afkzone.managers;
 
 import me.ehsan.afkzone.Main;
+import me.ehsan.afkzone.config.MessagesConfig;
 import me.ehsan.afkzone.models.NextRewardInfo;
 import me.ehsan.afkzone.models.Reward;
 import me.ehsan.afkzone.service.*;
@@ -17,7 +18,6 @@ import java.util.stream.Collectors;
 
 /**
  * Manages rewards and player tracking with a single global scheduler.
- * Now delegates to extracted services: PlayerTracker, TimerService, RewardDispatcher.
  */
 public class RewardManager {
 
@@ -27,6 +27,7 @@ public class RewardManager {
     private final TimerService timerService;
     private final RewardDispatcher rewardDispatcher;
     private final StorageService storageService;
+    private final MessagesConfig messagesConfig;
 
     private Map<String, Reward> rewards = new HashMap<>();
 
@@ -40,18 +41,16 @@ public class RewardManager {
     private float soundVolume = 1.0f;
     private float soundPitch = 1.0f;
 
-    private String msgEnterZone = "<green>Entered AFK zone: <yellow><zone></yellow></green>";
-    private String msgExitZone = "<gray>You left AFK zone: <yellow><zone></yellow></gray>";
-
     public RewardManager(Main plugin, ZoneService zoneService, PlayerTracker playerTracker,
                          TimerService timerService, RewardDispatcher rewardDispatcher,
-                         StorageService storageService) {
+                         StorageService storageService, MessagesConfig messagesConfig) {
         this.plugin = plugin;
         this.zoneService = zoneService;
         this.playerTracker = playerTracker;
         this.timerService = timerService;
         this.rewardDispatcher = rewardDispatcher;
         this.storageService = storageService;
+        this.messagesConfig = messagesConfig;
     }
 
     public Map<String, Reward> getRewards() {
@@ -107,29 +106,27 @@ public class RewardManager {
         this.soundVolume = (float) cfg.getDouble("global.sound_volume", 1.0);
         this.soundPitch = (float) cfg.getDouble("global.sound_pitch", 1.0);
 
-        // Timer config
-        timerService.setEnabled(cfg.getBoolean("global.timer.enabled", true));
-        timerService.setTemplate(cfg.getString("global.timer.template", "<gold><bold>Next reward in <timer></bold></gold>"));
-        timerService.setDisplay(cfg.getString("global.timer.display", "title"));
-        timerService.setSize(cfg.getString("global.timer.size", "big"));
-        timerService.setTitleFadeIn(cfg.getInt("global.timer.title.fade_in", 5));
-        timerService.setTitleStay(cfg.getInt("global.timer.title.stay", 40));
-        timerService.setTitleFadeOut(cfg.getInt("global.timer.title.fade_out", 5));
+        // Timer config from messages.yml
+        if (messagesConfig != null && messagesConfig.getTimer() != null) {
+            timerService.setTimerConfig(messagesConfig.getTimer());
+        }
 
-        // Messages
-        this.msgEnterZone = cfg.getString("global.messages.enter_zone", msgEnterZone);
-        this.msgExitZone = cfg.getString("global.messages.exit_zone", msgExitZone);
+        // Messages config from messages.yml
+        if (messagesConfig != null) {
+            if (messagesConfig.getRewardReceived() != null) {
+                rewardDispatcher.setMsgRewardReceived(messagesConfig.getRewardReceived());
+            }
+            if (messagesConfig.getRewardFailed() != null) {
+                rewardDispatcher.setMsgRewardFailed(messagesConfig.getRewardFailed());
+            }
+        }
 
-        // Reward dispatcher config
+        // Reward dispatcher sound config (still from config.yml)
         this.rewardSound = MessageUtils.parseSound(cfg.getString("global.reward_sound", "ENTITY_EXPERIENCE_ORB_PICKUP"),
                 plugin.getLogger(), "global.reward_sound");
         rewardDispatcher.setRewardSound(this.rewardSound);
         rewardDispatcher.setSoundVolume(this.soundVolume);
         rewardDispatcher.setSoundPitch(this.soundPitch);
-        rewardDispatcher.setMsgRewardReceived(cfg.getString("global.messages.reward_received",
-                "<gold>You received reward: <yellow><reward></yellow></gold>"));
-        rewardDispatcher.setMsgRewardFailed(cfg.getString("global.messages.reward_failed",
-                "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>"));
     }
 
     // -------------------------------------------------------------------------
@@ -185,7 +182,7 @@ public class RewardManager {
         String currentZone = zoneService.findZoneForLocation(player.getLocation());
         if (currentZone == null || !currentZone.equals(zoneName)) {
             Sound effectiveExitSound = resolveZoneSound(zoneName, "exit_sound", exitSound);
-            playerTracker.stopTracking(id, msgExitZone, effectiveExitSound, soundVolume, soundPitch, resetProgressOnLeave);
+            playerTracker.stopTracking(id, messagesConfig.getExitZone(), effectiveExitSound, soundVolume, soundPitch, resetProgressOnLeave);
             timerService.removePlayer(player);
             executeExitCommands(player, zoneName);
             return;
@@ -203,14 +200,10 @@ public class RewardManager {
             prog.merge(r.getName(), 1, Integer::sum);
         }
 
-        // Current-session counter (resets on next zone entry) - separate from
-        // both the per-reward progress counters above and the lifetime totals
-        // in storageService below, which are unaffected by leaving the zone.
+        // Current-session counter
         playerTracker.incrementSession(id);
 
-        // Track AFK time in storage. Wrapped separately so a storage failure
-        // (e.g. SQLite driver missing) can't block reward delivery below -
-        // stats are best-effort, rewards are the core mechanic.
+        // Track time in storage
         try {
             storageService.addAfkTime(id, 1);
             storageService.addZoneAfkTime(id, zoneName, 1);
@@ -246,7 +239,7 @@ public class RewardManager {
             }
         }
 
-        // Update timer display (only considering zone rewards; timer.enabled can be overridden per zone)
+        // Update timer display
         boolean timerEnabledForZone = zoneService.getZoneConfigBoolean(zoneName, "timer.enabled", timerService.isEnabled());
         NextRewardInfo info = getNearestReward(prog, given, zoneRewards);
         if (timerEnabledForZone && info.getRemainingSeconds() > 0) {
@@ -260,7 +253,8 @@ public class RewardManager {
 
     public void startTrackingPlayer(Player player, String zoneName) {
         Sound effectiveEnterSound = resolveZoneSound(zoneName, "enter_sound", enterSound);
-        playerTracker.startTracking(player, zoneName, effectiveEnterSound, soundVolume, soundPitch, msgEnterZone, resetProgressOnLeave);
+        playerTracker.startTracking(player, zoneName, effectiveEnterSound, soundVolume, soundPitch,
+                messagesConfig.getEnterZone(), resetProgressOnLeave);
         executeEntryCommands(player, zoneName);
     }
 
@@ -268,7 +262,7 @@ public class RewardManager {
         Player player = Bukkit.getPlayer(id);
         String zone = playerTracker.getPlayerZone(id);
         Sound effectiveExitSound = resolveZoneSound(zone, "exit_sound", exitSound);
-        playerTracker.stopTracking(id, msgExitZone, effectiveExitSound, soundVolume, soundPitch, resetProgressOnLeave);
+        playerTracker.stopTracking(id, messagesConfig.getExitZone(), effectiveExitSound, soundVolume, soundPitch, resetProgressOnLeave);
         timerService.removePlayer(player);
         if (player != null && zone != null) {
             executeExitCommands(player, zone);
@@ -354,11 +348,11 @@ public class RewardManager {
     }
 
     public void sendEnterMessage(Player player, String zoneName) {
-        MessageUtils.sendStyled(player, msgEnterZone, zoneName, null);
+        MessageUtils.sendStyled(player, messagesConfig.getEnterZone(), zoneName, null);
     }
 
     public void sendExitMessage(Player player, String zoneName) {
-        MessageUtils.sendStyled(player, msgExitZone, zoneName, null);
+        MessageUtils.sendStyled(player, messagesConfig.getExitZone(), zoneName, null);
         MessageUtils.playSound(player, resolveZoneSound(zoneName, "exit_sound", exitSound), soundVolume, soundPitch);
     }
 
@@ -366,12 +360,6 @@ public class RewardManager {
     // Per-zone config override resolution
     // -------------------------------------------------------------------------
 
-    /**
-     * Resolves a per-zone sound override for the given zones.yml key
-     * (enter_sound / exit_sound / reward_sound). "none" explicitly disables
-     * the sound for that zone; an unset or invalid value falls back to the
-     * global default passed in.
-     */
     private Sound resolveZoneSound(String zoneName, String key, Sound globalDefault) {
         if (zoneName == null) return globalDefault;
         String override = zoneService.getZoneConfigString(zoneName, key, null);

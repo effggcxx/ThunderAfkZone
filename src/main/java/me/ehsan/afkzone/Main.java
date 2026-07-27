@@ -1,6 +1,7 @@
 package me.ehsan.afkzone;
 
 import me.ehsan.afkzone.commands.AfkZoneCommand;
+import me.ehsan.afkzone.config.MessagesConfig;
 import me.ehsan.afkzone.listeners.WandListener;
 import me.ehsan.afkzone.listeners.ZoneListener;
 import me.ehsan.afkzone.managers.RewardManager;
@@ -25,6 +26,7 @@ public class Main extends JavaPlugin {
     private TimerService timerService;
     private RewardDispatcher rewardDispatcher;
     private StorageService storageService;
+    private MessagesConfig messagesConfig;
     private WandListener wandListener;
     private AfkZoneExpansion placeholderExpansion;
 
@@ -52,9 +54,13 @@ public class Main extends JavaPlugin {
         }
         storageService.initialize();
 
+        // Load messages config
+        this.messagesConfig = new MessagesConfig(this);
+        messagesConfig.load();
+
         this.rewardDispatcher = new RewardDispatcher(this, storageService);
         this.zoneManager = new ZoneManager(this, spatialIndex);
-        this.rewardManager = new RewardManager(this, zoneManager, playerTracker, timerService, rewardDispatcher, storageService);
+        this.rewardManager = new RewardManager(this, zoneManager, playerTracker, timerService, rewardDispatcher, storageService, messagesConfig);
 
         rewardManager.loadRewards();
         rewardManager.loadGlobalConfig();
@@ -102,12 +108,13 @@ public class Main extends JavaPlugin {
     }
 
     /**
-     * Full reload of config.yml + zones.yml.
+     * Full reload of config.yml + messages.yml + zones.yml.
      * Storage backend is NOT switched at runtime (requires restart).
      */
     public void reloadAll() {
         reloadConfig();
 
+        messagesConfig.load();
         rewardManager.loadRewards();
         rewardManager.loadGlobalConfig();
 

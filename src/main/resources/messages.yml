@@ -1,0 +1,44 @@
+# ============================================================
+# ThunderAfkZone - Messages Configuration
+# ============================================================
+# All player-facing messages are configurable here.
+# Each message has:
+#   text:    The message content (MiniMessage format)
+#   display: How to show it - "chat" | "title" | "actionbar" | "bossbar"
+#
+# Placeholders:
+#   <zone>   - Zone name
+#   <reward> - Reward name
+#   <timer>  - Time until next reward (e.g. "5:00")
+#   <player> - Player name
+# ============================================================
+
+# Message shown when entering a zone
+enter_zone:
+  text: "<green>Entered AFK zone: <yellow><zone></yellow></green>"
+  display: "title"
+
+# Message shown when leaving a zone
+exit_zone:
+  text: "<gray>You left AFK zone: <yellow><zone></yellow></gray>"
+  display: "title"
+
+# Message shown when a reward is received
+reward_received:
+  text: "<gold>You received reward: <yellow><reward></yellow></gold>"
+  display: "chat"
+
+# Message shown when a reward fails to deliver
+reward_failed:
+  text: "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>"
+  display: "chat"
+
+# Timer countdown shown while in a zone
+timer:
+  text: "<timer> remaining until next reward"
+  display: "title"
+  size: "big"           # "big" or "mini"
+  title:
+    fade_in: 5
+    stay: 40
+    fade_out: 5

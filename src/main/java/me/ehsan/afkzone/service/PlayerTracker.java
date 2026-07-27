@@ -1,5 +1,6 @@
 package me.ehsan.afkzone.service;
 
+import me.ehsan.afkzone.config.MessagesConfig;
 import me.ehsan.afkzone.util.MessageUtils;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -41,7 +42,7 @@ public class PlayerTracker {
     }
 
     public void startTracking(Player player, String zoneName, Sound enterSound, float soundVolume, float soundPitch,
-                              String msgEnterZone, boolean resetProgress) {
+                              MessagesConfig.MessageEntry enterEntry, boolean resetProgress) {
         UUID id = player.getUniqueId();
 
         // If already tracking a different zone, clean up first
@@ -57,11 +58,11 @@ public class PlayerTracker {
         playerGivenOnce.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
         sessionAfkSeconds.put(id, 0);
 
-        MessageUtils.sendStyled(player, msgEnterZone, zoneName, null);
+        MessageUtils.sendStyled(player, enterEntry, zoneName, null);
         MessageUtils.playSound(player, enterSound, soundVolume, soundPitch);
     }
 
-    public void stopTracking(UUID id, String msgExitZone, Sound exitSound, float soundVolume, float soundPitch,
+    public void stopTracking(UUID id, MessagesConfig.MessageEntry exitEntry, Sound exitSound, float soundVolume, float soundPitch,
                               boolean resetProgress) {
         if (resetProgress) {
             playerProgress.remove(id);
@@ -72,9 +73,7 @@ public class PlayerTracker {
 
         Player player = org.bukkit.Bukkit.getPlayer(id);
         if (player != null && zone != null) {
-            if (msgExitZone != null) {
-                MessageUtils.sendStyled(player, msgExitZone, zone, null);
-            }
+            MessageUtils.sendStyled(player, exitEntry, zone, null);
             MessageUtils.playSound(player, exitSound, soundVolume, soundPitch);
         }
     }

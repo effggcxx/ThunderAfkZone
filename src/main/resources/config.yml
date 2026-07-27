@@ -53,26 +53,9 @@ global:
   sound_volume: 1.0
   sound_pitch: 1.0
 
-  # Countdown timer shown while the player is AFK in a zone
+  # Timer display is now configured in messages.yml
   timer:
     enabled: true
-    template: "<yellow><bold>Next reward in <timer></bold></yellow>"
-    # title | actionbar | chat | bossbar
-    display: "title"
-    # big | mini  (affects title / actionbar / chat styling)
-    size: "big"
-    title:
-      fade_in: 5
-      stay: 40
-      fade_out: 5
-
-  # Player-facing messages (MiniMessage format)
-  # Placeholders: <zone>  <reward>  <timer>  <player>
-  messages:
-    enter_zone: "<green>Entered AFK zone: <yellow><zone></yellow></green>"
-    exit_zone: "<gray>You left AFK zone: <yellow><zone></yellow></gray>"
-    reward_received: "<gold>You received reward: <yellow><reward></yellow></gold>"
-    reward_failed: "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>"
 
 # ============================================================
 # Reward definitions

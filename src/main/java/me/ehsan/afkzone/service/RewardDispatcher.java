@@ -1,6 +1,7 @@
 package me.ehsan.afkzone.service;
 
 import me.ehsan.afkzone.Main;
+import me.ehsan.afkzone.config.MessagesConfig;
 import me.ehsan.afkzone.models.Reward;
 import me.ehsan.afkzone.storage.StorageService;
 import me.ehsan.afkzone.util.MessageUtils;
@@ -22,8 +23,8 @@ public class RewardDispatcher {
     private Sound rewardSound = null;
     private float soundVolume = 1.0f;
     private float soundPitch = 1.0f;
-    private String msgRewardReceived = "<gold>You received reward: <yellow><reward></yellow></gold>";
-    private String msgRewardFailed = "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>";
+    private MessagesConfig.MessageEntry msgRewardReceived;
+    private MessagesConfig.MessageEntry msgRewardFailed;
 
     public RewardDispatcher(Main plugin, StorageService storageService) {
         this.plugin = plugin;
@@ -35,8 +36,8 @@ public class RewardDispatcher {
     public void setRewardSound(Sound sound) { this.rewardSound = sound; }
     public void setSoundVolume(float volume) { this.soundVolume = volume; }
     public void setSoundPitch(float pitch) { this.soundPitch = pitch; }
-    public void setMsgRewardReceived(String msg) { this.msgRewardReceived = msg; }
-    public void setMsgRewardFailed(String msg) { this.msgRewardFailed = msg; }
+    public void setMsgRewardReceived(MessagesConfig.MessageEntry entry) { this.msgRewardReceived = entry; }
+    public void setMsgRewardFailed(MessagesConfig.MessageEntry entry) { this.msgRewardFailed = entry; }
 
     // --- Delivery ---
 

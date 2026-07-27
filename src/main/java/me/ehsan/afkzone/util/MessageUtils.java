@@ -1,5 +1,6 @@
 package me.ehsan.afkzone.util;
 
+import me.ehsan.afkzone.config.MessagesConfig;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -14,8 +15,7 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 /**
- * Shared message / timer helpers. Currently most logic still lives in RewardManager;
- * this class is kept for future extraction.
+ * Shared message / timer helpers.
  */
 public final class MessageUtils {
 
@@ -23,11 +23,58 @@ public final class MessageUtils {
 
     private MessageUtils() {}
 
+    /**
+     * Sends a message to a player using the configured display mode.
+     *
+     * @param player     the target player
+     * @param entry      the message entry (text + display mode)
+     * @param zoneName   zone name placeholder, or null
+     * @param rewardName reward name placeholder, or null
+     */
+    public static void sendStyled(Player player, MessagesConfig.MessageEntry entry, String zoneName, String rewardName) {
+        if (entry == null || entry.getText() == null || entry.getText().isEmpty()) return;
+        String text = entry.getText();
+        if (zoneName != null) text = text.replace("<zone>", zoneName);
+        if (rewardName != null) text = text.replace("<reward>", rewardName);
+        text = text.replace("<player>", player.getName());
+
+        Component component;
+        try {
+            component = MINI_MESSAGE.deserialize(text);
+        } catch (Exception ex) {
+            component = Component.text(text.replaceAll("<[^>]+>", ""));
+        }
+
+        String display = entry.getDisplay() != null ? entry.getDisplay().toLowerCase(Locale.ROOT) : "chat";
+        switch (display) {
+            case "actionbar" -> player.sendActionBar(component);
+            case "title" -> player.showTitle(Title.title(component, Component.empty(),
+                    Title.Times.times(
+                            Duration.ofMillis(5 * 50L),
+                            Duration.ofMillis(40 * 50L),
+                            Duration.ofMillis(5 * 50L)
+                    )));
+            case "bossbar" -> {
+                BossBar bar = BossBar.bossBar(component, 1f, BossBar.Color.YELLOW, BossBar.Overlay.PROGRESS);
+                player.showBossBar(bar);
+                // Auto-hide after 3 seconds
+                org.bukkit.Bukkit.getScheduler().runTaskLater(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(MessageUtils.class),
+                        () -> player.hideBossBar(bar), 60L);
+            }
+            default -> player.sendMessage(component);
+        }
+    }
+
+    /**
+     * Legacy overload for backward compatibility - sends as chat message.
+     */
     public static void sendStyled(Player player, String template, String zoneName, String rewardName) {
         if (template == null || template.isEmpty()) return;
         String text = template;
         if (zoneName != null) text = text.replace("<zone>", zoneName);
         if (rewardName != null) text = text.replace("<reward>", rewardName);
+        if (player != null) text = text.replace("<player>", player.getName());
         try {
             player.sendMessage(MINI_MESSAGE.deserialize(text));
         } catch (Exception ex) {

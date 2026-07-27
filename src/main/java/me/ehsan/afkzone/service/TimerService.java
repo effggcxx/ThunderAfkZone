@@ -1,5 +1,6 @@
 package me.ehsan.afkzone.service;
 
+import me.ehsan.afkzone.config.MessagesConfig;
 import me.ehsan.afkzone.util.MessageUtils;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
@@ -11,19 +12,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages timer display for AFK rewards using bossbar, title, actionbar, or chat.
- * Extracted from the original RewardManager for better separation of concerns.
+ * Uses MessagesConfig for template, display mode, and title timing.
  */
 public class TimerService {
 
     private final Map<UUID, BossBar> activeBossBars = new ConcurrentHashMap<>();
 
     private boolean enabled = true;
-    private String template = "<gold><bold>Next reward in <timer></bold></gold>";
-    private String display = "title";
-    private String size = "big";
-    private int titleFadeIn = 5;
-    private int titleStay = 40;
-    private int titleFadeOut = 5;
+    private MessagesConfig.TimerMessageEntry timerConfig;
 
     public TimerService() {}
 
@@ -31,22 +27,19 @@ public class TimerService {
 
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public boolean isEnabled() { return enabled; }
-    public void setTemplate(String template) { this.template = template; }
-    public String getTemplate() { return template; }
-    public void setDisplay(String display) { this.display = display; }
-    public String getDisplay() { return display; }
-    public void setSize(String size) { this.size = size; }
-    public String getSize() { return size; }
-    public void setTitleFadeIn(int fadeIn) { this.titleFadeIn = fadeIn; }
-    public void setTitleStay(int stay) { this.titleStay = stay; }
-    public void setTitleFadeOut(int fadeOut) { this.titleFadeOut = fadeOut; }
+
+    public void setTimerConfig(MessagesConfig.TimerMessageEntry config) {
+        this.timerConfig = config;
+    }
+
+    public MessagesConfig.TimerMessageEntry getTimerConfig() { return timerConfig; }
 
     // --- Display ---
 
     public void sendTimer(Player player, long secondsRemaining, long totalSeconds, String zoneName) {
-        if (!enabled) return;
-        MessageUtils.sendTimer(player, display, template, size,
-                titleFadeIn, titleStay, titleFadeOut, true,
+        if (!enabled || timerConfig == null) return;
+        MessageUtils.sendTimer(player, timerConfig.getDisplay(), timerConfig.getText(), timerConfig.getSize(),
+                timerConfig.getTitleFadeIn(), timerConfig.getTitleStay(), timerConfig.getTitleFadeOut(), true,
                 secondsRemaining, totalSeconds, zoneName, activeBossBars);
     }
 
