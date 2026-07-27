@@ -19,7 +19,6 @@ public class PlayerTracker {
     private final Map<UUID, Map<String, Integer>> playerProgress = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> playerGivenOnce = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerZone = new ConcurrentHashMap<>();
-    private final Map<UUID, Long> lastActive = new ConcurrentHashMap<>();
     // Current-session AFK seconds, separate from per-reward progress counters.
     // Resets to 0 on every new tracking session (zone enter); NOT persisted -
     // lifetime totals live in StorageService and are untouched by this.
@@ -57,8 +56,6 @@ public class PlayerTracker {
         playerProgress.computeIfAbsent(id, k -> new ConcurrentHashMap<>());
         playerGivenOnce.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
         sessionAfkSeconds.put(id, 0);
-        // Treat join as active so the AFK threshold has to pass before rewards start
-        lastActive.put(id, System.currentTimeMillis());
 
         MessageUtils.sendStyled(player, msgEnterZone, zoneName, null);
         MessageUtils.playSound(player, enterSound, soundVolume, soundPitch);
@@ -71,7 +68,6 @@ public class PlayerTracker {
             playerGivenOnce.remove(id);
         }
         String zone = playerZone.remove(id);
-        lastActive.remove(id);
         sessionAfkSeconds.remove(id);
 
         Player player = org.bukkit.Bukkit.getPlayer(id);
@@ -89,18 +85,7 @@ public class PlayerTracker {
             playerGivenOnce.remove(id);
         }
         playerZone.remove(id);
-        lastActive.remove(id);
         sessionAfkSeconds.remove(id);
-    }
-
-    // --- Activity ---
-
-    public void markActive(UUID id) {
-        lastActive.put(id, System.currentTimeMillis());
-    }
-
-    public long getLastActiveTime(UUID id) {
-        return lastActive.getOrDefault(id, System.currentTimeMillis());
     }
 
     // --- Progress ---
@@ -131,7 +116,6 @@ public class PlayerTracker {
         playerProgress.clear();
         playerGivenOnce.clear();
         playerZone.clear();
-        lastActive.clear();
         sessionAfkSeconds.clear();
     }
 }

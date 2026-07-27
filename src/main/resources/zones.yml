@@ -2,8 +2,7 @@
 # ThunderAfkZone zone definitions
 # ============================================================
 # Each zone defines a cuboid region. Players standing inside
-# an AFK zone while idle will receive rewards after the
-# configured afk_threshold_seconds in config.yml.
+# an AFK zone while idle will receive rewards.
 #
 # Create a zone with: /afkzone create <name>
 # (select the region with the wand tool: /afkzone wand)
@@ -27,7 +26,6 @@
 # Per-zone config overrides (optional):
 #   These override the matching keys in config.yml for players
 #   inside this zone:
-#       afk_threshold_seconds: 30
 #       enter_sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
 #       exit_sound: "none"
 #       reward_sound: "none"

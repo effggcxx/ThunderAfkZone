@@ -30,9 +30,6 @@ global:
   #   "highest" → give only the reward(s) with the highest priority
   on_multiple: "all"
 
-  # Seconds of inactivity before a player is considered AFK (rewards only tick while AFK)
-  afk_threshold_seconds: 60
-
   # Whether leaving a zone resets progress toward interval/once-after rewards.
   #   true  (default) - leaving (even briefly) resets all reward progress back
   #                      to zero, same as re-entering fresh. The current-session

@@ -33,7 +33,6 @@ public class RewardManager {
     private BukkitTask globalTask;
 
     private String onMultiple = "all";
-    private int afkThresholdSeconds = 60;
     private boolean resetProgressOnLeave = true;
     private Sound enterSound = null;
     private Sound exitSound = null;
@@ -100,7 +99,6 @@ public class RewardManager {
         FileConfiguration cfg = plugin.getConfig();
 
         this.onMultiple = cfg.getString("global.on_multiple", "all");
-        this.afkThresholdSeconds = cfg.getInt("global.afk_threshold_seconds", 60);
         this.resetProgressOnLeave = cfg.getBoolean("global.reset_progress_on_leave", true);
         this.enterSound = MessageUtils.parseSound(cfg.getString("global.enter_sound", "ENTITY_PLAYER_LEVELUP"),
                 plugin.getLogger(), "global.enter_sound");
@@ -190,13 +188,6 @@ public class RewardManager {
             playerTracker.stopTracking(id, msgExitZone, effectiveExitSound, soundVolume, soundPitch, resetProgressOnLeave);
             timerService.removePlayer(player);
             executeExitCommands(player, zoneName);
-            return;
-        }
-
-        // Only count time if the player is considered AFK (per-zone override supported)
-        long last = playerTracker.getLastActiveTime(id);
-        int effectiveThreshold = zoneService.getZoneConfigInt(zoneName, "afk_threshold_seconds", afkThresholdSeconds);
-        if ((System.currentTimeMillis() - last) < (effectiveThreshold * 1000L)) {
             return;
         }
 
@@ -290,10 +281,6 @@ public class RewardManager {
 
     public boolean isPlayerInAnyZone(UUID id) {
         return playerTracker.isPlayerInAnyZone(id);
-    }
-
-    public void markActive(UUID id) {
-        playerTracker.markActive(id);
     }
 
     // -------------------------------------------------------------------------
