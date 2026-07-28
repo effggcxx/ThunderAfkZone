@@ -90,3 +90,17 @@ rewards:
     once_after_seconds: 60
     priority: 10
     enabled: true
+
+  # Disabled by default - only works if ItemEdit is installed and an item
+  # named "afk_token" is actually saved in it (/itemedit save afk_token
+  # while holding the item, or however your ItemEdit version does it).
+  # Set enabled: true once that's set up if you want to use it.
+  itemedit_example:
+    description: "Example ItemEdit reward - every 10 minutes of AFK"
+    executor: "itemedit"
+    item: "afk_token"
+    amount: 1
+    interval_seconds: 600
+    once_after_seconds: 0
+    priority: 1
+    enabled: false
