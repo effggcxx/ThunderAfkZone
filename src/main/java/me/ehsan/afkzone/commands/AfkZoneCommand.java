@@ -656,6 +656,13 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         int y2 = max.getBlockY();
         int z2 = max.getBlockZ();
 
+        String overlapping = zoneManager.findOverlappingZone(worldName, x1, y1, z1, x2, y2, z2);
+        if (overlapping != null) {
+            msg(player, "<red>This selection overlaps the existing zone '<yellow>" + overlapping
+                    + "</yellow>'. Choose a non-overlapping area, or remove/resize that zone first.</red>");
+            return;
+        }
+
         var zonesConfig = zoneManager.getZonesConfig();
         String path = "zones." + name;
         zonesConfig.set(path + ".world", worldName);

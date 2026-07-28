@@ -78,6 +78,30 @@ public class ZoneManager implements ZoneService {
         return spatialIndex;
     }
 
+    /**
+     * Checks a candidate cuboid (in the given world) against every existing
+     * zone for an axis-aligned bounding box overlap. Returns the name of the
+     * first overlapping zone found, or null if the candidate is clear.
+     * Coordinates don't need to be pre-normalized (min/max order doesn't
+     * matter) - this normalizes internally the same way addZone() does.
+     */
+    public String findOverlappingZone(String world, int x1, int y1, int z1, int x2, int y2, int z2) {
+        int minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+        int minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+        int minZ = Math.min(z1, z2), maxZ = Math.max(z1, z2);
+
+        for (SpatialZoneIndex.ZoneBounds b : spatialIndex.getAllZones()) {
+            if (!b.world().equals(world)) continue;
+            boolean overlaps = minX <= b.x2() && b.x1() <= maxX
+                    && minY <= b.y2() && b.y1() <= maxY
+                    && minZ <= b.z2() && b.z1() <= maxZ;
+            if (overlaps) {
+                return b.name();
+            }
+        }
+        return null;
+    }
+
     @Override
     public Set<String> getZoneNames() {
         if (zonesConfig == null || !zonesConfig.isConfigurationSection("zones")) {
