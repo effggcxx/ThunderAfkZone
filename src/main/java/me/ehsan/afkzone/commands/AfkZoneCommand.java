@@ -8,7 +8,9 @@ import me.ehsan.afkzone.models.Reward;
 import me.ehsan.afkzone.models.WandSelection;
 import me.ehsan.afkzone.storage.StorageService;
 import me.ehsan.afkzone.util.MessageUtils;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -548,19 +550,29 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         ItemStack wand = new ItemStack(wandMat);
         ItemMeta meta = wand.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName("§6AFK Zone Wand");
-            meta.setLore(Arrays.asList(
-                    "§7Left-click: Set position 1",
-                    "§7Right-click: Set position 2",
-                    "§8/afkzone create [name] to save"
+            meta.displayName(noItalic(MM.deserialize("<gold><bold>Selection Wand</bold></gold>")));
+            meta.lore(List.of(
+                    noItalic(MM.deserialize("<gray>Used to select AFK zone corners.</gray>")),
+                    noItalic(MM.deserialize("<yellow>Left-click</yellow> <dark_gray>-</dark_gray> <gray>set position 1</gray>")),
+                    noItalic(MM.deserialize("<yellow>Right-click</yellow> <dark_gray>-</dark_gray> <gray>set position 2</gray>")),
+                    noItalic(MM.deserialize("<dark_gray>/afkzone create [name] to save</dark_gray>"))
             ));
             wand.setItemMeta(meta);
         }
         player.getInventory().addItem(wand);
-        msg(player, "<green>You received the AFK Zone Wand!</green>");
+        msg(player, "<green>You received the Selection Wand!</green>");
         msg(player, "<gray>Left-click a block to set position 1, right-click to set position 2.</gray>");
         msg(player, "<gray>Use <yellow>/afkzone create [name]</yellow> to create the zone from your selection.</gray>");
         msg(player, "<gray>Use <yellow>/afkzone sel</yellow> to view your current selection.</gray>");
+    }
+
+    /**
+     * Item names/lore render italic by default when given a styled Component -
+     * this turns that off so gold/gray text doesn't show up slanted, matching
+     * how vanilla non-enchanted item names normally look.
+     */
+    private Component noItalic(Component component) {
+        return component.decoration(TextDecoration.ITALIC, false);
     }
 
     private void showWandSelection(Player player) {
