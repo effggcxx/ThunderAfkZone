@@ -36,7 +36,7 @@ public class RewardManager {
     private String onMultiple = "all";
     private boolean resetProgressOnLeave = true;
     /** Seconds of inactivity required before reward progress ticks. 0 = no threshold (presence only). */
-    private int afkThresholdSeconds = 60;
+    private int afkThresholdSeconds = 0;
     private Sound enterSound = null;
     private Sound exitSound = null;
     private Sound rewardSound = null;
@@ -101,7 +101,7 @@ public class RewardManager {
 
         this.onMultiple = cfg.getString("global.on_multiple", "all");
         this.resetProgressOnLeave = cfg.getBoolean("global.reset_progress_on_leave", true);
-        this.afkThresholdSeconds = Math.max(0, cfg.getInt("global.afk_threshold_seconds", 60));
+        this.afkThresholdSeconds = Math.max(0, cfg.getInt("global.afk_threshold_seconds", 0));
         this.enterSound = MessageUtils.parseSound(cfg.getString("global.enter_sound", "ENTITY_PLAYER_LEVELUP"),
                 plugin.getLogger(), "global.enter_sound");
         this.exitSound = MessageUtils.parseSound(cfg.getString("global.exit_sound", "ENTITY_ITEM_BREAK"),
