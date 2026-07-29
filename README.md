@@ -109,6 +109,27 @@ All commands are under `/afkzone` (aliases: `/taz`, `/thunderafk`).
 | `afkzone.top` | op | Viewing leaderboards |
 | `afkzone.admin` | op | Every permission above, bundled |
 
+## AFK threshold
+
+Reward progress only advances while a player is **idle** inside a zone.
+
+```yaml
+global:
+  afk_threshold_seconds: 60   # 0 = presence only (no idle required)
+```
+
+Activity that resets the idle timer: block movement, chat, commands, and
+interacting with blocks/entities. Entering a zone also counts as activity, so
+players must wait the threshold after walking in before timers start.
+
+Per-zone override in `zones.yml`:
+
+```yaml
+zones:
+  spawn_afk:
+    afk_threshold_seconds: 30
+```
+
 ## Configuring rewards (`config.yml`)
 
 ```yaml

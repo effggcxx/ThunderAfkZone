@@ -40,6 +40,16 @@ global:
   #                       restart still clears it either way.
   reset_progress_on_leave: true
 
+  # Seconds of inactivity required before a player is considered AFK and
+  # reward progress starts ticking. Activity = block movement, chat, commands,
+  # or interacting with blocks/entities. Entering a zone counts as activity, so
+  # the player must stay idle for this many seconds after entering (or after
+  # any action) before timers advance.
+  #   0  = no threshold — simply being inside the zone is enough (presence mode)
+  #  60  = default — must be idle for 1 minute
+  # Can be overridden per-zone in zones.yml via afk_threshold_seconds.
+  afk_threshold_seconds: 60
+
   # Storage backend: "sqlite" (persistent) or "memory" (resets on restart).
   # "sqlite" requires the driver declared in plugin.yml's `libraries:` block -
   # check your startup log for "SQLite storage initialized"; if you see a

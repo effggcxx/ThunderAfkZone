@@ -26,6 +26,7 @@
 # Per-zone config overrides (optional):
 #   These override the matching keys in config.yml for players
 #   inside this zone:
+#       afk_threshold_seconds: 30   # idle seconds before rewards tick (0 = presence only)
 #       enter_sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
 #       exit_sound: "none"
 #       reward_sound: "none"

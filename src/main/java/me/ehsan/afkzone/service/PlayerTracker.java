@@ -20,6 +20,9 @@ public class PlayerTracker {
     private final Map<UUID, Map<String, Integer>> playerProgress = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> playerGivenOnce = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerZone = new ConcurrentHashMap<>();
+    // Last time the player performed an activity (move/chat/command/interact).
+    // Used by RewardManager to enforce afk_threshold_seconds before progress ticks.
+    private final Map<UUID, Long> lastActive = new ConcurrentHashMap<>();
     // Current-session AFK seconds, separate from per-reward progress counters.
     // Resets to 0 on every new tracking session (zone enter); NOT persisted -
     // lifetime totals live in StorageService and are untouched by this.
@@ -57,6 +60,9 @@ public class PlayerTracker {
         playerProgress.computeIfAbsent(id, k -> new ConcurrentHashMap<>());
         playerGivenOnce.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
         sessionAfkSeconds.put(id, 0);
+        // Treat zone entry as activity so the AFK threshold must elapse
+        // before reward progress starts ticking.
+        lastActive.put(id, System.currentTimeMillis());
 
         MessageUtils.sendStyled(player, enterEntry, zoneName, null);
         MessageUtils.playSound(player, enterSound, soundVolume, soundPitch);
@@ -70,6 +76,7 @@ public class PlayerTracker {
         }
         String zone = playerZone.remove(id);
         sessionAfkSeconds.remove(id);
+        lastActive.remove(id);
 
         Player player = org.bukkit.Bukkit.getPlayer(id);
         if (player != null && zone != null) {
@@ -85,6 +92,26 @@ public class PlayerTracker {
         }
         playerZone.remove(id);
         sessionAfkSeconds.remove(id);
+        lastActive.remove(id);
+    }
+
+    // --- Activity / AFK threshold ---
+
+    /**
+     * Records that the player performed an action (move, chat, command, interact).
+     * Resets the idle timer used by the AFK threshold check.
+     */
+    public void markActive(UUID id) {
+        if (playerZone.containsKey(id)) {
+            lastActive.put(id, System.currentTimeMillis());
+        }
+    }
+
+    /**
+     * Millis timestamp of the player's last activity, or current time if unknown.
+     */
+    public long getLastActiveTime(UUID id) {
+        return lastActive.getOrDefault(id, System.currentTimeMillis());
     }
 
     // --- Progress ---
@@ -115,6 +142,7 @@ public class PlayerTracker {
         playerProgress.clear();
         playerGivenOnce.clear();
         playerZone.clear();
+        lastActive.clear();
         sessionAfkSeconds.clear();
     }
 }

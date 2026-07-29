@@ -35,6 +35,8 @@ public class RewardManager {
 
     private String onMultiple = "all";
     private boolean resetProgressOnLeave = true;
+    /** Seconds of inactivity required before reward progress ticks. 0 = no threshold (presence only). */
+    private int afkThresholdSeconds = 60;
     private Sound enterSound = null;
     private Sound exitSound = null;
     private Sound rewardSound = null;
@@ -99,6 +101,7 @@ public class RewardManager {
 
         this.onMultiple = cfg.getString("global.on_multiple", "all");
         this.resetProgressOnLeave = cfg.getBoolean("global.reset_progress_on_leave", true);
+        this.afkThresholdSeconds = Math.max(0, cfg.getInt("global.afk_threshold_seconds", 60));
         this.enterSound = MessageUtils.parseSound(cfg.getString("global.enter_sound", "ENTITY_PLAYER_LEVELUP"),
                 plugin.getLogger(), "global.enter_sound");
         this.exitSound = MessageUtils.parseSound(cfg.getString("global.exit_sound", "ENTITY_ITEM_BREAK"),
@@ -188,6 +191,16 @@ public class RewardManager {
             return;
         }
 
+        // Only count time if the player is considered AFK (per-zone override supported).
+        // threshold 0 = no idle requirement (presence alone is enough).
+        int effectiveThreshold = zoneService.getZoneConfigInt(zoneName, "afk_threshold_seconds", afkThresholdSeconds);
+        if (effectiveThreshold > 0) {
+            long last = playerTracker.getLastActiveTime(id);
+            if ((System.currentTimeMillis() - last) < (effectiveThreshold * 1000L)) {
+                return;
+            }
+        }
+
         Map<String, Integer> prog = playerTracker.getProgress(id);
         Set<String> given = playerTracker.getGivenOnce(id);
 
@@ -275,6 +288,14 @@ public class RewardManager {
 
     public boolean isPlayerInAnyZone(UUID id) {
         return playerTracker.isPlayerInAnyZone(id);
+    }
+
+    /**
+     * Records player activity so the AFK threshold timer resets.
+     * Called from ActivityListener on move/chat/command/interact.
+     */
+    public void markActive(UUID id) {
+        playerTracker.markActive(id);
     }
 
     // -------------------------------------------------------------------------

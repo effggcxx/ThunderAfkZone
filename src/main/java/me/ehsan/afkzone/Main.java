@@ -2,6 +2,7 @@ package me.ehsan.afkzone;
 
 import me.ehsan.afkzone.commands.AfkZoneCommand;
 import me.ehsan.afkzone.config.MessagesConfig;
+import me.ehsan.afkzone.listeners.ActivityListener;
 import me.ehsan.afkzone.listeners.WandListener;
 import me.ehsan.afkzone.listeners.ZoneListener;
 import me.ehsan.afkzone.managers.RewardManager;
@@ -74,6 +75,7 @@ public class Main extends JavaPlugin {
 
         // Register listeners
         getServer().getPluginManager().registerEvents(new ZoneListener(zoneManager, rewardManager), this);
+        getServer().getPluginManager().registerEvents(new ActivityListener(rewardManager), this);
         getServer().getPluginManager().registerEvents(wandListener, this);
 
         // Register command
