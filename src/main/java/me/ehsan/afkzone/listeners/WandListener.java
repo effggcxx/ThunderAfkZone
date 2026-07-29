@@ -71,13 +71,12 @@ public class WandListener implements Listener {
         // Only handle block clicks
         if (event.getClickedBlock() == null) return;
 
-        event.setCancelled(true);
-
         Location loc = event.getClickedBlock().getLocation();
         WandSelection sel = getSelection(player);
 
         if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
-            // Position 1
+            // Position 1 — cancel so the block isn't broken
+            event.setCancelled(true);
             sel.setPos1(loc);
             msg(player, "<green>Set position 1 to: <white>" + formatLoc(loc) + "</white></green>");
             if (sel.isComplete()) {
@@ -87,7 +86,9 @@ public class WandListener implements Listener {
                 msg(player, "<gray>Now select position 2 with right-click.</gray>");
             }
         } else if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-            // Position 2
+            // Position 2 — do NOT cancel so the block interaction (open door,
+            // place block, etc.) still happens. The wand is still detected
+            // and the position is recorded.
             sel.setPos2(loc);
             msg(player, "<green>Set position 2 to: <white>" + formatLoc(loc) + "</white></green>");
             if (sel.isComplete()) {

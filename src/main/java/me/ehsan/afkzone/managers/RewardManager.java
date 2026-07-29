@@ -292,7 +292,7 @@ public class RewardManager {
 
     /**
      * Records player activity so the AFK threshold timer resets.
-     * Called from ActivityListener on move/chat/command/interact.
+     * Called from ZoneListener on move/chat/command/interact.
      */
     public void markActive(UUID id) {
         playerTracker.markActive(id);
@@ -323,9 +323,13 @@ public class RewardManager {
     }
 
     // -------------------------------------------------------------------------
-    // Reward helpers
+    // Reward helpers (public so PlaceholderAPI expansion can delegate)
     // -------------------------------------------------------------------------
 
+    /**
+     * Returns the list of enabled rewards that apply to the given zone.
+     * If the zone has no reward restrictions, all enabled global rewards are returned.
+     */
     public List<Reward> getRewardsForZone(String zoneName) {
         List<String> zoneRewardNames = zoneService.getZoneRewards(zoneName);
         if (zoneRewardNames == null || zoneRewardNames.isEmpty()) {
@@ -343,7 +347,10 @@ public class RewardManager {
         return result;
     }
 
-    private NextRewardInfo getNearestReward(Map<String, Integer> prog, Set<String> given, List<Reward> zoneRewards) {
+    /**
+     * Returns the nearest upcoming reward info for a player's current progress.
+     */
+    public NextRewardInfo getNearestReward(Map<String, Integer> prog, Set<String> given, List<Reward> zoneRewards) {
         long nearest = Long.MAX_VALUE;
         long total = 0;
         for (Reward r : zoneRewards) {

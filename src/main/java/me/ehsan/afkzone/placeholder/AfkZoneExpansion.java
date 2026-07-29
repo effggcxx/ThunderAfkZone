@@ -1,10 +1,10 @@
 package me.ehsan.afkzone.placeholder;
 
 import me.ehsan.afkzone.Main;
+import me.ehsan.afkzone.managers.RewardManager;
 import me.ehsan.afkzone.models.NextRewardInfo;
 import me.ehsan.afkzone.models.Reward;
 import me.ehsan.afkzone.service.PlayerTracker;
-import me.ehsan.afkzone.service.ZoneService;
 import me.ehsan.afkzone.storage.StorageService;
 import me.ehsan.afkzone.util.MessageUtils;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
@@ -16,27 +16,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * PlaceholderAPI expansion for ThunderAfkZone.
  * Provides: %afkzone_zone%, %afkzone_time%, %afkzone_next_reward%, %afkzone_rewards_received%, %afkzone_afk_time%, %afkzone_zone_time_<zone>%
+ *
+ * Delegates reward logic to RewardManager to avoid code duplication.
  */
 public class AfkZoneExpansion extends PlaceholderExpansion {
 
     private final Main plugin;
-    private final ZoneService zoneService;
+    private final RewardManager rewardManager;
     private final PlayerTracker playerTracker;
     private final StorageService storageService;
-    private final Map<String, Reward> rewards;
 
-    public AfkZoneExpansion(Main plugin, ZoneService zoneService, PlayerTracker playerTracker,
-                            StorageService storageService, Map<String, Reward> rewards) {
+    public AfkZoneExpansion(Main plugin, PlayerTracker playerTracker,
+                            StorageService storageService) {
         this.plugin = plugin;
-        this.zoneService = zoneService;
+        this.rewardManager = plugin.getRewardManager();
         this.playerTracker = playerTracker;
         this.storageService = storageService;
-        this.rewards = rewards;
     }
 
     @Override
@@ -89,8 +88,8 @@ public class AfkZoneExpansion extends PlaceholderExpansion {
                 if (zone == null) return "";
                 Map<String, Integer> prog = playerTracker.getProgress(id);
                 Set<String> given = playerTracker.getGivenOnce(id);
-                List<Reward> zoneRewards = getRewardsForZone(zone);
-                NextRewardInfo info = getNearestReward(prog, given, zoneRewards);
+                List<Reward> zoneRewards = rewardManager.getRewardsForZone(zone);
+                NextRewardInfo info = rewardManager.getNearestReward(prog, given, zoneRewards);
                 if (info.getRemainingSeconds() <= 0) return "";
                 return MessageUtils.formatDuration(info.getRemainingSeconds());
             }
@@ -111,43 +110,5 @@ public class AfkZoneExpansion extends PlaceholderExpansion {
                 return "";
             }
         }
-    }
-
-    private List<Reward> getRewardsForZone(String zoneName) {
-        List<String> zoneRewardNames = zoneService.getZoneRewards(zoneName);
-        if (zoneRewardNames == null || zoneRewardNames.isEmpty()) {
-            return rewards.values().stream()
-                    .filter(Reward::isEnabled)
-                    .collect(Collectors.toList());
-        }
-        return zoneRewardNames.stream()
-                .map(rewards::get)
-                .filter(r -> r != null && r.isEnabled())
-                .collect(Collectors.toList());
-    }
-
-    private NextRewardInfo getNearestReward(Map<String, Integer> prog, Set<String> given, List<Reward> zoneRewards) {
-        long nearest = Long.MAX_VALUE;
-        long total = 0;
-        for (Reward r : zoneRewards) {
-            if (!r.isEnabled()) continue;
-            int current = prog.getOrDefault(r.getName(), 0);
-            if (r.getOnceAfterSeconds() > 0 && !given.contains(r.getName())) {
-                long remaining = r.getOnceAfterSeconds() - current;
-                if (remaining >= 0 && remaining < nearest) {
-                    nearest = remaining;
-                    total = r.getOnceAfterSeconds();
-                }
-            }
-            if (r.getIntervalSeconds() > 0) {
-                long mod = current % r.getIntervalSeconds();
-                long remaining = r.getIntervalSeconds() - mod;
-                if (remaining >= 0 && remaining < nearest) {
-                    nearest = remaining;
-                    total = r.getIntervalSeconds();
-                }
-            }
-        }
-        return nearest == Long.MAX_VALUE ? new NextRewardInfo(0, 0) : new NextRewardInfo(nearest, total);
     }
 }

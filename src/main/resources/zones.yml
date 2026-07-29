@@ -27,10 +27,30 @@
 #   These override the matching keys in config.yml for players
 #   inside this zone:
 #       afk_threshold_seconds: 30   # idle seconds before rewards tick (0 = presence only)
-#       enter_sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
-#       exit_sound: "none"
-#       reward_sound: "none"
-#       timer.enabled: false
+#       enter_sound: "ENTITY_EXPERIENCE_ORB_PICKUP"   # plays on entry; set to "none" to mute
+#       exit_sound: "none"                            # "none" disables the sound for this zone
+#       reward_sound: "ENTITY_PLAYER_LEVELUP"         # plays when a reward is given
+#       timer.enabled: false                          # disable countdown timer for this zone
+#
+# Example zone with overrides:
+#   spawn_afk:
+#     world: "world"
+#     x1: -10    y1: 60    z1: -10
+#     x2: 10     y2: 70    z2: 10
+#     afk_threshold_seconds: 30
+#     enter_sound: "BLOCK_NOTE_BLOCK_PLING"
+#     exit_sound: "none"
+#     reward_sound: "ENTITY_PLAYER_LEVELUP"
+#     timer.enabled: true
+#     rewards:
+#       - "welcome_diamond"
+#       - "starter_kit"
+#     on_enter:
+#       commands:
+#         - "effect give {player} minecraft:speed 60 0"
+#     on_exit:
+#       commands:
+#         - "effect clear {player} minecraft:speed"
 # ============================================================
 
 zones: {}

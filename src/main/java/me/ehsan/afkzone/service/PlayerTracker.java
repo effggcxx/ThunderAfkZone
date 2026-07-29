@@ -23,10 +23,13 @@ public class PlayerTracker {
     // Last time the player performed an activity (move/chat/command/interact).
     // Used by RewardManager to enforce afk_threshold_seconds before progress ticks.
     private final Map<UUID, Long> lastActive = new ConcurrentHashMap<>();
-    // Current-session AFK seconds, separate from per-reward progress counters.
-    // Resets to 0 on every new tracking session (zone enter); NOT persisted -
-    // lifetime totals live in StorageService and are untouched by this.
-    private final Map<UUID, Integer> sessionAfkSeconds = new ConcurrentHashMap<>();
+    // Current-session seconds spent in zone (separate from per-reward progress).
+    // Incremented every tick regardless of AFK threshold; resets to 0 on every
+    // new tracking session (zone enter). NOT persisted - lifetime totals live
+    // in StorageService and are untouched by this.
+    // NOTE: This counts zone presence time, not idle/AFK time. If an AFK
+    // threshold is configured, reward progress ticks slower than this counter.
+    private final Map<UUID, Integer> sessionZoneSeconds = new ConcurrentHashMap<>();
 
     public PlayerTracker() {}
 
@@ -59,7 +62,7 @@ public class PlayerTracker {
         // instead of wiping it back to empty on re-entry.
         playerProgress.computeIfAbsent(id, k -> new ConcurrentHashMap<>());
         playerGivenOnce.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
-        sessionAfkSeconds.put(id, 0);
+        sessionZoneSeconds.put(id, 0);
         // Treat zone entry as activity so the AFK threshold must elapse
         // before reward progress starts ticking.
         lastActive.put(id, System.currentTimeMillis());
@@ -75,7 +78,7 @@ public class PlayerTracker {
             playerGivenOnce.remove(id);
         }
         String zone = playerZone.remove(id);
-        sessionAfkSeconds.remove(id);
+        sessionZoneSeconds.remove(id);
         lastActive.remove(id);
 
         Player player = org.bukkit.Bukkit.getPlayer(id);
@@ -91,7 +94,7 @@ public class PlayerTracker {
             playerGivenOnce.remove(id);
         }
         playerZone.remove(id);
-        sessionAfkSeconds.remove(id);
+        sessionZoneSeconds.remove(id);
         lastActive.remove(id);
     }
 
@@ -131,11 +134,11 @@ public class PlayerTracker {
      * tick per player - NOT once per reward, unlike getProgress().
      */
     public void incrementSession(UUID id) {
-        sessionAfkSeconds.merge(id, 1, Integer::sum);
+        sessionZoneSeconds.merge(id, 1, Integer::sum);
     }
 
     public int getSessionSeconds(UUID id) {
-        return sessionAfkSeconds.getOrDefault(id, 0);
+        return sessionZoneSeconds.getOrDefault(id, 0);
     }
 
     public void clear() {
@@ -143,6 +146,6 @@ public class PlayerTracker {
         playerGivenOnce.clear();
         playerZone.clear();
         lastActive.clear();
-        sessionAfkSeconds.clear();
+        sessionZoneSeconds.clear();
     }
 }

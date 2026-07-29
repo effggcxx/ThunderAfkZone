@@ -2,7 +2,6 @@ package me.ehsan.afkzone;
 
 import me.ehsan.afkzone.commands.AfkZoneCommand;
 import me.ehsan.afkzone.config.MessagesConfig;
-import me.ehsan.afkzone.listeners.ActivityListener;
 import me.ehsan.afkzone.listeners.WandListener;
 import me.ehsan.afkzone.listeners.ZoneListener;
 import me.ehsan.afkzone.managers.RewardManager;
@@ -73,9 +72,8 @@ public class Main extends JavaPlugin {
         this.wandListener = new WandListener(this);
         wandListener.loadConfig();
 
-        // Register listeners
+        // Register listeners (ZoneListener handles both zone detection and activity marking)
         getServer().getPluginManager().registerEvents(new ZoneListener(zoneManager, rewardManager), this);
-        getServer().getPluginManager().registerEvents(new ActivityListener(rewardManager), this);
         getServer().getPluginManager().registerEvents(wandListener, this);
 
         // Register command
@@ -87,7 +85,7 @@ public class Main extends JavaPlugin {
 
         // Register PlaceholderAPI expansion if available
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
-            this.placeholderExpansion = new AfkZoneExpansion(this, zoneManager, playerTracker, storageService, rewardManager.getRewards());
+            this.placeholderExpansion = new AfkZoneExpansion(this, playerTracker, storageService);
             placeholderExpansion.register();
             getLogger().info("PlaceholderAPI expansion registered");
         }
