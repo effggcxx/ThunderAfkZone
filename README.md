@@ -7,8 +7,7 @@ and track statistics per player and per zone.
 ## Features
 
 - **Built-in zone selection wand** — no external dependency needed. Left-click
-  sets corner 1, right-click sets corner 2, with a live particle outline of
-  the selection while you work.
+  sets corner 1, right-click sets corner 2.
 - **Flexible rewards** — repeating (`interval_seconds`) or one-time
   (`once_after_seconds`) rewards, given via vanilla `/give`, ItemEdit, or any
   console command. Toggle rewards on/off without deleting their config.
@@ -16,9 +15,11 @@ and track statistics per player and per zone.
   global reward pool; optionally restrict specific zones to a subset of rewards.
 - **Per-zone enter/exit commands** — run arbitrary console commands when a
   player enters or leaves a zone.
-- **Countdown display** — title, action bar, chat, or a persistent boss bar
-  showing time until the next reward, fully styled via MiniMessage.
-- **Zone boundary particles** — optional visual outline shown to nearby players.
+- **Overlap protection** — creating a zone that overlaps an existing one is
+  blocked with a clear error naming the conflicting zone.
+- **Fully configurable messages** — every player-facing message (enter, exit,
+  reward received/failed, timer) has its own text and display mode
+  (chat/title/actionbar/boss bar), set independently in `messages.yml`.
 - **Persistent or in-memory storage** — SQLite for stats that survive restarts,
   or plain in-memory tracking if you don't need persistence.
 - **Player statistics** — lifetime AFK time, per-zone AFK time, and rewards
@@ -56,12 +57,13 @@ failed initialization, switch to `storage: "memory"` until it's resolved.
 1. `/afkzone wand` — gives you the selection tool (a wooden hoe by default,
    configurable via `wand.item` in `config.yml`).
 2. **Left-click** a block to set corner 1, **right-click** another block to
-   set corner 2. A particle outline shows the selection live as you go, and
-   a single point is shown while only one corner is set.
+   set corner 2.
 3. `/afkzone sel` — check your current selection at any time (corners +
    dimensions), if you want to confirm before creating.
 4. `/afkzone create <name>` — creates the zone from your selection and clears
-   it, ready for the next one.
+   it, ready for the next one. If the selection overlaps an existing zone,
+   creation is blocked and you'll get an error naming which zone it conflicts
+   with — resize your selection or remove/adjust the other zone first.
 5. `/afkzone cancel` — clears your current selection without creating anything.
 
 Only players with `afkzone.wand` permission are affected when holding the
@@ -81,7 +83,7 @@ All commands are under `/afkzone` (aliases: `/taz`, `/thunderafk`).
 | `/afkzone list` | List all configured zones |
 | `/afkzone info <name>` | Show a zone's coordinates and which rewards apply there |
 | `/afkzone remove <name>` | Delete a zone |
-| `/afkzone reload` | Reload config, zones, and particle settings |
+| `/afkzone reload` | Reload config.yml, messages.yml, and zones.yml |
 | `/afkzone reward list` | List all configured rewards and their enabled state |
 | `/afkzone reward give <reward> [player]` | Manually give a reward |
 | `/afkzone zonereward list <zone>` | Show which rewards are restricted to a zone |
@@ -111,16 +113,20 @@ All commands are under `/afkzone` (aliases: `/taz`, `/thunderafk`).
 
 ## AFK threshold
 
-Reward progress only advances while a player is **idle** inside a zone.
+By default (`afk_threshold_seconds: 0`), simply being inside a zone counts as
+AFK and reward progress starts immediately. Set this above `0` if you want to
+require genuine idling instead - progress will only advance once a player has
+gone that many seconds without any activity inside the zone.
 
 ```yaml
 global:
-  afk_threshold_seconds: 60   # 0 = presence only (no idle required)
+  afk_threshold_seconds: 0    # 0 = default, presence only (no idle required)
 ```
 
 Activity that resets the idle timer: block movement, chat, commands, and
 interacting with blocks/entities. Entering a zone also counts as activity, so
-players must wait the threshold after walking in before timers start.
+if this is set above `0`, players must wait the threshold after walking in
+before timers start.
 
 Per-zone override in `zones.yml`:
 
@@ -153,6 +159,9 @@ rewards:
     priority: 10
     enabled: true
 ```
+
+`config.yml` also ships a third example, `itemedit_example` (disabled by
+default), showing the `itemedit` executor syntax.
 
 A reward needs **at least one** of `interval_seconds` or `once_after_seconds`
 set above `0`, or it can never fire. `priority` only matters if
@@ -199,6 +208,35 @@ zones:
         - "say {player} left {zone}"
 ```
 
+## Messages (`messages.yml`)
+
+Every player-facing message - `enter_zone`, `exit_zone`, `reward_received`,
+`reward_failed`, and the `timer` countdown - has its own entry here, each
+with independent text *and* display mode:
+
+```yaml
+enter_zone:
+  text: "<green>Entered AFK zone: <yellow><zone></yellow></green>"
+  display: "title"          # chat | title | actionbar | bossbar
+
+timer:
+  text: "<timer> remaining until next reward"
+  display: "title"
+  size: "big"                # "big" or "mini"
+  title:
+    fade_in: 5
+    stay: 40
+    fade_out: 5
+```
+
+Placeholders available: `<zone>`, `<reward>`, `<timer>`, `<player>` (not all
+apply to every message - `<timer>` only makes sense in the `timer` entry).
+Text is MiniMessage format throughout, same as everywhere else in the plugin.
+`display: "title"` and `"bossbar"` both put the message front-and-center on
+screen rather than in chat; `enter_zone`/`exit_zone`/`timer` default to
+`"title"`, `reward_received`/`reward_failed` default to `"chat"` so they
+don't fight with whatever's currently showing as a title.
+
 ## PlaceholderAPI
 
 Requires PlaceholderAPI installed. Placeholders:
@@ -228,17 +266,16 @@ The built jar is output to `build/libs/`.
 ```yaml
 wand:
   item: "WOODEN_HOE"       # any Bukkit Material name
-  particles:
-    enabled: true
-    count: 1
-    spacing: 1.5            # blocks between particles along the outline
-    type: "END_ROD"         # any Bukkit Particle name
 ```
 
 Changing `wand.item` to something players don't normally hold (an axe or a
 stick, say) avoids any chance of confusion even for staff who forget they're
 holding it. Whatever you pick, only players with `afkzone.wand` are affected
 by clicks with that item - it never touches normal players' tool use.
+
+The wand itself is named and described in-item (gold "Selection Wand" with
+lore explaining left/right-click) so players don't need to check docs to know
+what it does.
 
 ## Storage
 
