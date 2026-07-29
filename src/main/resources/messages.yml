@@ -37,7 +37,7 @@ reward_failed:
 timer:
   text: "<timer> remaining until next reward"
   display: "title"
-  size: "big"           # "big" or "mini"
+  size: "mini"           # "big" or "mini"
   title:
     fade_in: 5
     stay: 40
