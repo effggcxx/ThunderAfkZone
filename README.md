@@ -1,5 +1,11 @@
 # ThunderAfkZone
 
+[![Paper 1.21+](https://img.shields.io/badge/Paper-1.21%2B-6A5ACD?logo=papermc)](https://papermc.io/downloads/paper)
+[![Java 21](https://img.shields.io/badge/Java-21-007396?logo=openjdk)](https://openjdk.org/projects/jdk/21/)
+[![License MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![PlaceholderAPI Supported](https://img.shields.io/badge/PlaceholderAPI-Supported-2E8B57)](https://github.com/PlaceholderAPI/PlaceholderAPI)
+[![SQLite](https://img.shields.io/badge/SQLite-Supported-003B57?logo=sqlite)](https://www.sqlite.org/)
+
 A Paper 1.21+ plugin for AFK reward zones: define cuboid regions with the
 built-in selection wand, give players rewards for staying AFK inside them,
 and track statistics per player and per zone.
