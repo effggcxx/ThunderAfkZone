@@ -74,6 +74,26 @@ public class MemoryStorage implements StorageService {
     }
 
     @Override
+    public void savePlayerProgress(UUID playerId, Map<String, Integer> progress) {
+        // No-op: in-memory storage doesn't persist progress
+    }
+
+    @Override
+    public Map<String, Integer> loadPlayerProgress(UUID playerId) {
+        return new HashMap<>();
+    }
+
+    @Override
+    public void savePlayerGivenOnce(UUID playerId, Set<String> givenOnce) {
+        // No-op: in-memory storage doesn't persist progress
+    }
+
+    @Override
+    public Set<String> loadPlayerGivenOnce(UUID playerId) {
+        return new HashSet<>();
+    }
+
+    @Override
     public boolean isPersistent() {
         return false;
     }

@@ -61,6 +61,21 @@ public class SqliteStorage implements StorageService {
                     "  PRIMARY KEY (uuid, zone_name)" +
                     ")"
                 );
+                stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS player_progress (" +
+                    "  uuid VARCHAR(36) NOT NULL," +
+                    "  reward_name VARCHAR(64) NOT NULL," +
+                    "  progress INT DEFAULT 0," +
+                    "  PRIMARY KEY (uuid, reward_name)" +
+                    ")"
+                );
+                stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS player_given_once (" +
+                    "  uuid VARCHAR(36) NOT NULL," +
+                    "  reward_name VARCHAR(64) NOT NULL," +
+                    "  PRIMARY KEY (uuid, reward_name)" +
+                    ")"
+                );
             }
             plugin.getLogger().info("SQLite storage initialized: " + dbFile.getName());
         } catch (Exception e) {
@@ -209,6 +224,93 @@ public class SqliteStorage implements StorageService {
             plugin.getLogger().log(Level.WARNING, "Error reading top rewards", e);
         }
         return results;
+    }
+
+    @Override
+    public void savePlayerProgress(UUID playerId, Map<String, Integer> progress) {
+        if (!isReady() || progress == null) return;
+        String uuid = playerId.toString();
+        try {
+            // Clear old progress for this player, then insert new
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "DELETE FROM player_progress WHERE uuid = ?")) {
+                ps.setString(1, uuid);
+                ps.executeUpdate();
+            }
+            if (progress.isEmpty()) return;
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO player_progress (uuid, reward_name, progress) VALUES (?, ?, ?)")) {
+                for (Map.Entry<String, Integer> entry : progress.entrySet()) {
+                    ps.setString(1, uuid);
+                    ps.setString(2, entry.getKey());
+                    ps.setInt(3, entry.getValue());
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.WARNING, "Error saving progress for " + playerId, e);
+        }
+    }
+
+    @Override
+    public Map<String, Integer> loadPlayerProgress(UUID playerId) {
+        Map<String, Integer> result = new HashMap<>();
+        if (!isReady()) return result;
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT reward_name, progress FROM player_progress WHERE uuid = ?")) {
+            ps.setString(1, playerId.toString());
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                result.put(rs.getString("reward_name"), rs.getInt("progress"));
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.WARNING, "Error loading progress for " + playerId, e);
+        }
+        return result;
+    }
+
+    @Override
+    public void savePlayerGivenOnce(UUID playerId, Set<String> givenOnce) {
+        if (!isReady() || givenOnce == null) return;
+        String uuid = playerId.toString();
+        try {
+            // Clear old data for this player, then insert new
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "DELETE FROM player_given_once WHERE uuid = ?")) {
+                ps.setString(1, uuid);
+                ps.executeUpdate();
+            }
+            if (givenOnce.isEmpty()) return;
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO player_given_once (uuid, reward_name) VALUES (?, ?)")) {
+                for (String rewardName : givenOnce) {
+                    ps.setString(1, uuid);
+                    ps.setString(2, rewardName);
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.WARNING, "Error saving given-once for " + playerId, e);
+        }
+    }
+
+    @Override
+    public Set<String> loadPlayerGivenOnce(UUID playerId) {
+        Set<String> result = new HashSet<>();
+        if (!isReady()) return result;
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT reward_name FROM player_given_once WHERE uuid = ?")) {
+            ps.setString(1, playerId.toString());
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                result.add(rs.getString("reward_name"));
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.WARNING, "Error loading given-once for " + playerId, e);
+        }
+        return result;
     }
 
     @Override

@@ -1,9 +1,8 @@
 package me.ehsan.afkzone.storage;
 
-import me.ehsan.afkzone.models.Reward;
-
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -64,6 +63,32 @@ public interface StorageService {
      * Gets the top players by rewards received.
      */
     List<Map.Entry<UUID, Integer>> getTopRewards(int limit);
+
+    // --- Reward progress persistence (survives restarts) ---
+
+    /**
+     * Saves a player's per-reward progress to persistent storage.
+     * Called when progress changes or when the player leaves a zone.
+     */
+    void savePlayerProgress(UUID playerId, Map<String, Integer> progress);
+
+    /**
+     * Loads a player's per-reward progress from persistent storage.
+     * Returns an empty map if no saved progress exists.
+     */
+    Map<String, Integer> loadPlayerProgress(UUID playerId);
+
+    /**
+     * Saves the set of once-given rewards for a player.
+     * Called when the player leaves a zone or periodically.
+     */
+    void savePlayerGivenOnce(UUID playerId, Set<String> givenOnce);
+
+    /**
+     * Loads the set of once-given rewards for a player.
+     * Returns an empty set if no saved data exists.
+     */
+    Set<String> loadPlayerGivenOnce(UUID playerId);
 
     // --- Pure in-memory fallback ---
 

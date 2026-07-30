@@ -38,6 +38,10 @@ public class RewardManager {
 
     private BukkitTask globalTask;
 
+    // Counter for periodic progress persistence (every 30 seconds)
+    private int progressSaveCounter = 0;
+    private static final int PROGRESS_SAVE_INTERVAL = 30; // seconds
+
     private String onMultiple = "all";
     private boolean resetProgressOnLeave = true;
     /** Seconds of inactivity required before reward progress ticks. 0 = no threshold (presence only). */
@@ -250,6 +254,12 @@ public class RewardManager {
             globalTask.cancel();
             globalTask = null;
         }
+        // Save all tracked players' progress before shutdown
+        if (!resetProgressOnLeave && storageService.isPersistent()) {
+            for (UUID id : playerTracker.getTrackedPlayers().keySet()) {
+                savePlayerProgress(id);
+            }
+        }
         timerService.hideAllBossBars();
         playerTracker.clear();
     }
@@ -274,6 +284,10 @@ public class RewardManager {
     private void tickOnePlayer(UUID id) {
         Player player = Bukkit.getPlayer(id);
         if (player == null || !player.isOnline()) {
+            // Save progress before clearing if we're preserving it
+            if (!resetProgressOnLeave) {
+                savePlayerProgress(id);
+            }
             playerTracker.stopTrackingSilent(id, resetProgressOnLeave);
             timerService.removePlayer(player);
             return;
@@ -285,6 +299,10 @@ public class RewardManager {
         // Verify player is still inside the zone
         String currentZone = zoneService.findZoneForLocation(player.getLocation());
         if (currentZone == null || !currentZone.equals(zoneName)) {
+            // Save progress before leaving if we're preserving it
+            if (!resetProgressOnLeave) {
+                savePlayerProgress(id);
+            }
             Sound effectiveExitSound = resolveZoneSound(zoneName, "exit_sound", exitSound);
             playerTracker.stopTracking(id, messagesConfig.getExitZone(), effectiveExitSound, soundVolume, soundPitch, resetProgressOnLeave);
             timerService.removePlayer(player);
@@ -353,6 +371,15 @@ public class RewardManager {
             }
         }
 
+        // Periodic progress persistence (every 30 seconds) for crash safety
+        if (!resetProgressOnLeave) {
+            progressSaveCounter++;
+            if (progressSaveCounter >= PROGRESS_SAVE_INTERVAL) {
+                progressSaveCounter = 0;
+                savePlayerProgress(id);
+            }
+        }
+
         // Update timer display
         boolean timerEnabledForZone = zoneService.getZoneConfigBoolean(zoneName, "timer.enabled", timerService.isEnabled());
         NextRewardInfo info = getNearestReward(prog, given, zoneRewards);
@@ -366,6 +393,10 @@ public class RewardManager {
     // -------------------------------------------------------------------------
 
     public void startTrackingPlayer(Player player, String zoneName) {
+        // If not resetting progress, try to load persisted progress from storage
+        if (!resetProgressOnLeave) {
+            loadPlayerProgress(player.getUniqueId());
+        }
         Sound effectiveEnterSound = resolveZoneSound(zoneName, "enter_sound", enterSound);
         playerTracker.startTracking(player, zoneName, effectiveEnterSound, soundVolume, soundPitch,
                 messagesConfig.getEnterZone(), resetProgressOnLeave);
@@ -373,6 +404,10 @@ public class RewardManager {
     }
 
     public void stopTrackingPlayer(UUID id) {
+        // Save progress before stopping if we're preserving it
+        if (!resetProgressOnLeave) {
+            savePlayerProgress(id);
+        }
         Player player = Bukkit.getPlayer(id);
         String zone = playerTracker.getPlayerZone(id);
         Sound effectiveExitSound = resolveZoneSound(zone, "exit_sound", exitSound);
@@ -420,6 +455,44 @@ public class RewardManager {
                     .replace("{zone}", zoneName)
                     .replace("{uuid}", player.getUniqueId().toString());
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), parsed);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Progress persistence
+    // -------------------------------------------------------------------------
+
+    /**
+     * Saves a player's reward progress and once-given set to persistent storage.
+     */
+    private void savePlayerProgress(UUID id) {
+        if (!storageService.isPersistent()) return;
+        Map<String, Integer> progress = playerTracker.getProgress(id);
+        Set<String> givenOnce = playerTracker.getGivenOnce(id);
+        storageService.savePlayerProgress(id, progress);
+        storageService.savePlayerGivenOnce(id, givenOnce);
+    }
+
+    /**
+     * Loads a player's reward progress and once-given set from persistent storage.
+     * Only loads if the player has no existing progress in memory (first time this session).
+     */
+    private void loadPlayerProgress(UUID id) {
+        if (!storageService.isPersistent()) return;
+        Map<String, Integer> progress = playerTracker.getProgress(id);
+        // Only load from storage if there's no existing progress in memory
+        if (progress.isEmpty()) {
+            Map<String, Integer> saved = storageService.loadPlayerProgress(id);
+            if (!saved.isEmpty()) {
+                progress.putAll(saved);
+            }
+        }
+        Set<String> givenOnce = playerTracker.getGivenOnce(id);
+        if (givenOnce.isEmpty()) {
+            Set<String> saved = storageService.loadPlayerGivenOnce(id);
+            if (!saved.isEmpty()) {
+                givenOnce.addAll(saved);
+            }
         }
     }
 

@@ -36,8 +36,8 @@ global:
   #                       Useful if players commonly get bumped out briefly
   #                       (server hiccups, accidental steps out of the zone)
   #                       and losing all progress each time feels punishing.
-  #                       Progress is only held in memory - a full server
-  #                       restart still clears it either way.
+  #                       When using SQLite storage, progress is periodically
+  #                       saved and persists across server restarts.
   reset_progress_on_leave: true
 
   # Seconds of inactivity required before a player is considered AFK and

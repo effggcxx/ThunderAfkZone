@@ -39,6 +39,9 @@ permissions:
   afkzone.reward.give:
     description: Allows manually giving a configured reward to a player
     default: op
+  afkzone.reward.save:
+    description: Allows saving a held item as a reward
+    default: op
   afkzone.zonereward.list:
     description: Allows viewing per-zone reward assignments
     default: op
@@ -77,6 +80,7 @@ permissions:
       afkzone.reload: true
       afkzone.reward.list: true
       afkzone.reward.give: true
+      afkzone.reward.save: true
       afkzone.zonereward: true
       afkzone.stats: true
       afkzone.top: true
