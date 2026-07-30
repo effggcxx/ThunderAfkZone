@@ -69,49 +69,20 @@ global:
     enabled: true
 
 # ============================================================
-# Reward definitions
-# ============================================================
-# executor options:
-#   give / vanilla  → /give <player> <item> <amount>
-#   itemedit        → /si give <player> <item> <amount>   (requires ItemEdit)
-#   console         → run any console command (use the "command:" field)
+# Rewards are no longer defined in this file.
+# Use /afkzone reward save <name> while holding an item to
+# create rewards in-game. They are saved in the rewards/
+# folder as individual YAML files.
 #
-# Timing:
-#   interval_seconds   → repeat every X seconds (0 = disabled)
-#   once_after_seconds → give once after X seconds of AFK (0 = disabled)
-#   priority           → used only when on_multiple = "highest"
-#   enabled            → false pauses the reward without deleting it
-
-rewards:
-  welcome_diamond:
-    description: "A diamond every 5 minutes of AFK"
-    executor: "give"
-    item: "diamond"
-    amount: 1
-    interval_seconds: 300
-    once_after_seconds: 0
-    priority: 5
-    enabled: true
-
-  starter_kit:
-    description: "One-time iron sword after 60 seconds of AFK"
-    executor: "console"
-    command: "give {player} iron_sword 1"
-    interval_seconds: 0
-    once_after_seconds: 60
-    priority: 10
-    enabled: true
-
-  # Disabled by default - only works if ItemEdit is installed and an item
-  # named "afk_token" is actually saved in it (/itemedit save afk_token
-  # while holding the item, or however your ItemEdit version does it).
-  # Set enabled: true once that's set up if you want to use it.
-  itemedit_example:
-    description: "Example ItemEdit reward - every 10 minutes of AFK"
-    executor: "itemedit"
-    item: "afk_token"
-    amount: 1
-    interval_seconds: 600
-    once_after_seconds: 0
-    priority: 1
-    enabled: false
+# Example:
+#   /afkzone reward save welcome_diamond 1 300
+#   - saves the item in your hand as "welcome_diamond"
+#   - amount: 1, interval: 300s (give every 5 minutes)
+#   - /afkzone reward save starter_kit 1 0
+#   - saves the item as "starter_kit" (given once when player enters zone)
+#
+# Use /afkzone reward list to see all saved rewards.
+# ============================================================
+# Legacy reward definitions (from config.yml) are no longer read.
+# Existing rewards from config.yml should be re-created using
+# the /afkzone reward save command.

@@ -21,6 +21,7 @@ public class MessagesConfig {
     private MessageEntry exitZone;
     private MessageEntry rewardReceived;
     private MessageEntry rewardFailed;
+    private MessageEntry inventoryFull;
     private TimerMessageEntry timer;
 
     public MessagesConfig(Main plugin) {
@@ -41,6 +42,7 @@ public class MessagesConfig {
         exitZone = loadMessageEntry("exit_zone");
         rewardReceived = loadMessageEntry("reward_received");
         rewardFailed = loadMessageEntry("reward_failed");
+        inventoryFull = loadMessageEntry("inventory_full");
         timer = loadTimerMessageEntry("timer");
 
         plugin.getLogger().info("Messages config loaded (" + file.getAbsolutePath() + ")");
@@ -54,7 +56,7 @@ public class MessagesConfig {
 
     private TimerMessageEntry loadTimerMessageEntry(String path) {
         String text = messages.getString(path + ".text", "<timer> remaining until next reward");
-        String display = messages.getString(path + ".display", "title");
+        String display = messages.getString(path + ".display", "bossbar");
         String size = messages.getString(path + ".size", "big");
         int fadeIn = messages.getInt(path + ".title.fade_in", 5);
         int stay = messages.getInt(path + ".title.stay", 40);
@@ -68,6 +70,7 @@ public class MessagesConfig {
     public MessageEntry getExitZone() { return exitZone; }
     public MessageEntry getRewardReceived() { return rewardReceived; }
     public MessageEntry getRewardFailed() { return rewardFailed; }
+    public MessageEntry getInventoryFull() { return inventoryFull; }
     public TimerMessageEntry getTimer() { return timer; }
 
     // --- Data classes ---

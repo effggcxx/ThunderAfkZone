@@ -7,13 +7,13 @@ import me.ehsan.afkzone.storage.StorageService;
 import me.ehsan.afkzone.util.MessageUtils;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
-
-import java.util.Locale;
-import java.util.logging.Level;
+import org.bukkit.inventory.ItemStack;
 
 /**
- * Handles reward delivery (command dispatch, item giving, etc.).
- * Extracted from the original RewardManager for better separation of concerns.
+ * Handles reward delivery by giving the saved ItemStack directly to the player.
+ * Rewards are defined by holding an item in hand and saving it in-game with
+ * /afkzone reward save <name>. The item properties are serialized and
+ * stored, and this dispatcher gives the exact saved item.
  */
 public class RewardDispatcher {
 
@@ -25,6 +25,7 @@ public class RewardDispatcher {
     private float soundPitch = 1.0f;
     private MessagesConfig.MessageEntry msgRewardReceived;
     private MessagesConfig.MessageEntry msgRewardFailed;
+    private MessagesConfig.MessageEntry msgInventoryFull;
 
     public RewardDispatcher(Main plugin, StorageService storageService) {
         this.plugin = plugin;
@@ -38,6 +39,7 @@ public class RewardDispatcher {
     public void setSoundPitch(float pitch) { this.soundPitch = pitch; }
     public void setMsgRewardReceived(MessagesConfig.MessageEntry entry) { this.msgRewardReceived = entry; }
     public void setMsgRewardFailed(MessagesConfig.MessageEntry entry) { this.msgRewardFailed = entry; }
+    public void setMsgInventoryFull(MessagesConfig.MessageEntry entry) { this.msgInventoryFull = entry; }
 
     // --- Delivery ---
 
@@ -46,64 +48,53 @@ public class RewardDispatcher {
     }
 
     /**
-     * Same as {@link #giveRewardToPlayer(Reward, Player)} but lets the caller
-     * supply the reward sound to use for this specific delivery - used by
-     * RewardManager to apply a zone's reward_sound override, if any, without
-     * touching the global default stored on this dispatcher.
+     * Gives the saved ItemStack to the player. Uses the reward's stored item
+     * properties and amount. If the item stack is null (no item was saved),
+     * the reward fails silently and a warning is logged.
+     *
+     * @param r                     the reward to give
+     * @param player                the target player
+     * @param effectiveRewardSound  the sound to play on successful delivery
      */
     public void giveRewardToPlayer(Reward r, Player player, Sound effectiveRewardSound) {
         if (r == null || player == null) return;
 
         boolean ok = true;
-        String ex = r.getExecutor() == null ? "console" : r.getExecutor().toLowerCase(Locale.ROOT);
+        boolean overflow = false;
 
         try {
-            switch (ex) {
-                case "console" -> {
-                    if (r.getCommand() != null && !r.getCommand().isEmpty()) {
-                        String cmd = r.getCommand().replace("{player}", player.getName()).replace("{award}", r.getName());
-                        ok = dispatchAndCheck(cmd, r.getName());
-                    }
-                }
-                case "itemedit" -> {
-                    String dispatch = "si give " + player.getName() + " " + r.getItemName() + " " + r.getAmount();
-                    ok = dispatchAndCheck(dispatch, r.getName());
-                }
-                case "vanilla", "give" -> {
-                    String giveCmd = "give " + player.getName() + " " + r.getItemName() + " " + r.getAmount();
-                    ok = dispatchAndCheck(giveCmd, r.getName());
-                }
-                default -> {
-                    if (r.getCommand() != null && !r.getCommand().isEmpty()) {
-                        String fallback = r.getCommand().replace("{player}", player.getName()).replace("{award}", r.getName());
-                        ok = dispatchAndCheck(fallback, r.getName());
+            ItemStack item = r.getItemStack();
+            if (item == null) {
+                plugin.getLogger().warning("Reward '" + r.getName() + "' has no saved item stack - skipping");
+                ok = false;
+            } else {
+                // Clone and set the configured amount
+                ItemStack giveItem = item.clone();
+                giveItem.setAmount(r.getAmount());
+
+                // Add to player's inventory; drop if full
+                java.util.Map<Integer, ItemStack> leftover = player.getInventory().addItem(giveItem);
+                if (!leftover.isEmpty()) {
+                    overflow = true;
+                    for (ItemStack drop : leftover.values()) {
+                        player.getWorld().dropItemNaturally(player.getLocation(), drop);
                     }
                 }
             }
-        } catch (Exception ex2) {
-            plugin.getLogger().severe("Failed to give reward " + r.getName() + ": " + ex2.getMessage());
+        } catch (Exception ex) {
+            plugin.getLogger().severe("Failed to give reward " + r.getName() + ": " + ex.getMessage());
             ok = false;
         }
 
         if (ok) {
             MessageUtils.sendStyled(player, msgRewardReceived, null, r.getName());
+            if (overflow) {
+                MessageUtils.sendStyled(player, msgInventoryFull, null, r.getName());
+            }
             MessageUtils.playSound(player, effectiveRewardSound, soundVolume, soundPitch);
             storageService.incrementRewardsReceived(player.getUniqueId());
         } else {
             MessageUtils.sendStyled(player, msgRewardFailed, null, r.getName());
-        }
-    }
-
-    private boolean dispatchAndCheck(String command, String rewardName) {
-        try {
-            boolean result = plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), command);
-            if (!result) {
-                plugin.getLogger().warning("Command for reward '" + rewardName + "' returned failure: /" + command);
-            }
-            return result;
-        } catch (Exception ex) {
-            plugin.getLogger().severe("Exception dispatching command for reward '" + rewardName + "': /" + command + " - " + ex.getMessage());
-            return false;
         }
     }
 }

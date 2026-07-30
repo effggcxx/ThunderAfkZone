@@ -9,15 +9,20 @@ import me.ehsan.afkzone.storage.StorageService;
 import me.ehsan.afkzone.util.MessageUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * Manages rewards and player tracking with a single global scheduler.
+ * Rewards are stored as individual YAML files in the rewards/ folder.
  */
 public class RewardManager {
 
@@ -72,28 +77,121 @@ public class RewardManager {
     }
 
     // -------------------------------------------------------------------------
+    // Rewards folder
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the rewards data folder, creating it if it doesn't exist.
+     */
+    public File getRewardsFolder() {
+        File folder = new File(plugin.getDataFolder(), "rewards");
+        if (!folder.exists()) {
+            folder.mkdirs();
+        }
+        return folder;
+    }
+
+    /**
+     * Returns the file for a given reward name.
+     */
+    public File getRewardFile(String name) {
+        return new File(getRewardsFolder(), name.toLowerCase(Locale.ROOT) + ".yml");
+    }
+
+    // -------------------------------------------------------------------------
     // Configuration loading
     // -------------------------------------------------------------------------
 
     public void loadRewards() {
         rewards.clear();
-        FileConfiguration cfg = plugin.getConfig();
-        if (!cfg.isConfigurationSection("rewards")) return;
-        for (String key : cfg.getConfigurationSection("rewards").getKeys(false)) {
-            String path = "rewards." + key;
-            Reward r = new Reward(key);
-            r.setDescription(cfg.getString(path + ".description", ""));
-            r.setExecutor(cfg.getString(path + ".executor", "console"));
-            r.setItemName(cfg.getString(path + ".item", cfg.getString(path + ".command", "")));
-            r.setAmount(cfg.getInt(path + ".amount", 1));
-            r.setCommand(cfg.getString(path + ".command", ""));
-            r.setIntervalSeconds(cfg.getInt(path + ".interval_seconds", 0));
-            r.setOnceAfterSeconds(cfg.getInt(path + ".once_after_seconds", 0));
-            r.setPriority(cfg.getInt(path + ".priority", 0));
-            r.setEnabled(cfg.getBoolean(path + ".enabled", true));
-            rewards.put(key, r);
+        File folder = getRewardsFolder();
+        File[] files = folder.listFiles((dir, name) -> name.endsWith(".yml"));
+        if (files == null || files.length == 0) {
+            plugin.getLogger().info("No reward files found in rewards/ folder");
+            return;
         }
-        plugin.getLogger().info("Loaded " + rewards.size() + " rewards");
+        for (File file : files) {
+            String fileName = file.getName();
+            String rewardName = fileName.substring(0, fileName.length() - 4); // remove .yml
+            YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+            Reward r = new Reward(rewardName);
+            r.loadFromConfig(config);
+
+            // Load item stack from the "item" section
+            if (config.isConfigurationSection("item")) {
+                ConfigurationSection itemSection = config.getConfigurationSection("item");
+                if (itemSection != null) {
+                    Map<String, Object> itemData = itemSection.getValues(true);
+                    ItemStack item = Reward.deserializeItem(itemData);
+                    r.setItemStack(item);
+                }
+            }
+
+            rewards.put(rewardName, r);
+        }
+        plugin.getLogger().info("Loaded " + rewards.size() + " rewards from rewards/ folder");
+    }
+
+    /**
+     * Saves a reward to its individual YAML file in the rewards/ folder.
+     * Includes the serialized item stack data.
+     */
+    public void saveReward(Reward reward) {
+        File file = getRewardFile(reward.getName());
+        YamlConfiguration config = new YamlConfiguration();
+
+        // Save config fields
+        reward.saveToConfig(config);
+
+        // Save item stack data
+        if (reward.getItemStack() != null) {
+            Map<String, Object> itemData = reward.serializeItem();
+            ConfigurationSection itemSection = config.createSection("item");
+            for (Map.Entry<String, Object> entry : itemData.entrySet()) {
+                itemSection.set(entry.getKey(), entry.getValue());
+            }
+        }
+
+        try {
+            config.save(file);
+        } catch (Exception e) {
+            plugin.getLogger().severe("Failed to save reward '" + reward.getName() + "': " + e.getMessage());
+        }
+    }
+
+    /**
+     * Deletes a reward file from the rewards/ folder.
+     */
+    public boolean deleteReward(String name) {
+        File file = getRewardFile(name);
+        if (file.exists()) {
+            return file.delete();
+        }
+        return false;
+    }
+
+    /**
+     * Creates or updates a reward from an item in hand, saving it to the rewards/ folder.
+     */
+    public Reward saveRewardFromItem(String name, ItemStack item, String description,
+                                      int amount, int intervalSeconds, int onceAfterSeconds,
+                                      int priority, boolean enabled) {
+        Reward reward = new Reward(name);
+        reward.setDescription(description != null ? description : "");
+        reward.setAmount(amount);
+        reward.setIntervalSeconds(intervalSeconds);
+        reward.setOnceAfterSeconds(onceAfterSeconds);
+        reward.setPriority(priority);
+        reward.setEnabled(enabled);
+        reward.setItemStack(item.clone());
+        // Set the amount on the item stack to match the configured amount
+        reward.getItemStack().setAmount(amount);
+
+        // Save to file
+        saveReward(reward);
+        // Add to in-memory map
+        rewards.put(name, reward);
+        return reward;
     }
 
     public void loadGlobalConfig() {
@@ -121,6 +219,9 @@ public class RewardManager {
             }
             if (messagesConfig.getRewardFailed() != null) {
                 rewardDispatcher.setMsgRewardFailed(messagesConfig.getRewardFailed());
+            }
+            if (messagesConfig.getInventoryFull() != null) {
+                rewardDispatcher.setMsgInventoryFull(messagesConfig.getInventoryFull());
             }
         }
 

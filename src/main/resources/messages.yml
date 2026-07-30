@@ -33,11 +33,16 @@ reward_failed:
   text: "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>"
   display: "chat"
 
+# Message shown when the player's inventory is full and the reward drops on the ground
+inventory_full:
+  text: "<red>Your inventory was full! Reward '<reward>' fell on the ground.</red>"
+  display: "chat"
+
 # Timer countdown shown while in a zone
 timer:
   text: "<timer> remaining until next reward"
-  display: "title"
-  size: "mini"           # "big" or "mini"
+  display: "bossbar"
+  size: "big"           # "big" or "mini"
   title:
     fade_in: 5
     stay: 40
