@@ -1,4 +1,4 @@
-# ThunderAfkZone
+# ThunderAfkZone ( not ready to use yet )
 
 A Paper 1.21+ plugin for AFK reward zones: define cuboid regions with the
 built-in selection wand, give players rewards for staying AFK inside them,
