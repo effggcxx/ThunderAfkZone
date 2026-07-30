@@ -31,6 +31,8 @@ public class RewardManager {
     private final PlayerTracker playerTracker;
     private final TimerService timerService;
     private final RewardDispatcher rewardDispatcher;
+    private final RewardEvaluationService rewardEvaluationService;
+    private final RewardPersistenceService rewardPersistenceService;
     private final StorageService storageService;
     private final MessagesConfig messagesConfig;
 
@@ -54,12 +56,16 @@ public class RewardManager {
 
     public RewardManager(Main plugin, ZoneService zoneService, PlayerTracker playerTracker,
                          TimerService timerService, RewardDispatcher rewardDispatcher,
+                         RewardEvaluationService rewardEvaluationService,
+                         RewardPersistenceService rewardPersistenceService,
                          StorageService storageService, MessagesConfig messagesConfig) {
         this.plugin = plugin;
         this.zoneService = zoneService;
         this.playerTracker = playerTracker;
         this.timerService = timerService;
         this.rewardDispatcher = rewardDispatcher;
+        this.rewardEvaluationService = rewardEvaluationService;
+        this.rewardPersistenceService = rewardPersistenceService;
         this.storageService = storageService;
         this.messagesConfig = messagesConfig;
     }
@@ -418,23 +424,8 @@ public class RewardManager {
         }
 
         // Collect due rewards
-        Set<Reward> due = new HashSet<>();
-        for (Reward r : zoneRewards) {
-            if (!r.isEnabled()) continue;
-            int t = prog.getOrDefault(r.getName(), 0);
-            if (r.getOnceAfterSeconds() > 0 && !given.contains(r.getName()) && t >= r.getOnceAfterSeconds()) {
-                due.add(r);
-            }
-            if (r.getIntervalSeconds() > 0 && t > 0 && t % r.getIntervalSeconds() == 0) {
-                due.add(r);
-            }
-        }
-
+        Set<Reward> due = rewardEvaluationService.evaluateDueRewards(zoneRewards, prog, given, onMultiple);
         if (!due.isEmpty()) {
-            if ("highest".equalsIgnoreCase(onMultiple)) {
-                int max = due.stream().mapToInt(Reward::getPriority).max().orElse(Integer.MIN_VALUE);
-                due = due.stream().filter(x -> x.getPriority() == max).collect(Collectors.toSet());
-            }
             Sound effectiveRewardSound = resolveZoneSound(zoneName, "reward_sound", rewardSound);
             for (Reward r : due) {
                 rewardDispatcher.giveRewardToPlayer(r, player, effectiveRewardSound);
@@ -455,7 +446,7 @@ public class RewardManager {
 
         // Update timer display
         boolean timerEnabledForZone = zoneService.getZoneConfigBoolean(zoneName, "timer.enabled", timerService.isEnabled());
-        NextRewardInfo info = getNearestReward(prog, given, zoneRewards);
+        NextRewardInfo info = rewardEvaluationService.getNearestReward(prog, given, zoneRewards);
         if (timerEnabledForZone && info.getRemainingSeconds() > 0) {
             timerService.sendTimer(player, info.getRemainingSeconds(), info.getTotalSeconds(), zoneName);
         }
@@ -539,11 +530,7 @@ public class RewardManager {
      * Saves a player's reward progress and once-given set to persistent storage.
      */
     private void savePlayerProgress(UUID id) {
-        if (!storageService.isPersistent()) return;
-        Map<String, Integer> progress = playerTracker.getProgress(id);
-        Set<String> givenOnce = playerTracker.getGivenOnce(id);
-        storageService.savePlayerProgress(id, progress);
-        storageService.savePlayerGivenOnce(id, givenOnce);
+        rewardPersistenceService.savePlayerProgress(id, playerTracker.getProgress(id), playerTracker.getGivenOnce(id));
     }
 
     /**
@@ -551,22 +538,7 @@ public class RewardManager {
      * Only loads if the player has no existing progress in memory (first time this session).
      */
     private void loadPlayerProgress(UUID id) {
-        if (!storageService.isPersistent()) return;
-        Map<String, Integer> progress = playerTracker.getProgress(id);
-        // Only load from storage if there's no existing progress in memory
-        if (progress.isEmpty()) {
-            Map<String, Integer> saved = storageService.loadPlayerProgress(id);
-            if (!saved.isEmpty()) {
-                progress.putAll(saved);
-            }
-        }
-        Set<String> givenOnce = playerTracker.getGivenOnce(id);
-        if (givenOnce.isEmpty()) {
-            Set<String> saved = storageService.loadPlayerGivenOnce(id);
-            if (!saved.isEmpty()) {
-                givenOnce.addAll(saved);
-            }
-        }
+        rewardPersistenceService.loadPlayerProgress(id, playerTracker.getProgress(id), playerTracker.getGivenOnce(id));
     }
 
     // -------------------------------------------------------------------------
@@ -594,32 +566,8 @@ public class RewardManager {
         return result;
     }
 
-    /**
-     * Returns the nearest upcoming reward info for a player's current progress.
-     */
     public NextRewardInfo getNearestReward(Map<String, Integer> prog, Set<String> given, List<Reward> zoneRewards) {
-        long nearest = Long.MAX_VALUE;
-        long total = 0;
-        for (Reward r : zoneRewards) {
-            if (!r.isEnabled()) continue;
-            int current = prog.getOrDefault(r.getName(), 0);
-            if (r.getOnceAfterSeconds() > 0 && !given.contains(r.getName())) {
-                long remaining = r.getOnceAfterSeconds() - current;
-                if (remaining >= 0 && remaining < nearest) {
-                    nearest = remaining;
-                    total = r.getOnceAfterSeconds();
-                }
-            }
-            if (r.getIntervalSeconds() > 0) {
-                long mod = current % r.getIntervalSeconds();
-                long remaining = r.getIntervalSeconds() - mod;
-                if (remaining >= 0 && remaining < nearest) {
-                    nearest = remaining;
-                    total = r.getIntervalSeconds();
-                }
-            }
-        }
-        return nearest == Long.MAX_VALUE ? new NextRewardInfo(0, 0) : new NextRewardInfo(nearest, total);
+        return rewardEvaluationService.getNearestReward(prog, given, zoneRewards);
     }
 
     public void sendEnterMessage(Player player, String zoneName) {

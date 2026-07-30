@@ -9,6 +9,8 @@ import me.ehsan.afkzone.managers.ZoneManager;
 import me.ehsan.afkzone.placeholder.AfkZoneExpansion;
 import me.ehsan.afkzone.service.PlayerTracker;
 import me.ehsan.afkzone.service.RewardDispatcher;
+import me.ehsan.afkzone.service.RewardEvaluationService;
+import me.ehsan.afkzone.service.RewardPersistenceService;
 import me.ehsan.afkzone.service.SpatialZoneIndex;
 import me.ehsan.afkzone.service.TimerService;
 import me.ehsan.afkzone.service.ZoneService;
@@ -25,6 +27,8 @@ public class Main extends JavaPlugin {
     private PlayerTracker playerTracker;
     private TimerService timerService;
     private RewardDispatcher rewardDispatcher;
+    private RewardEvaluationService rewardEvaluationService;
+    private RewardPersistenceService rewardPersistenceService;
     private StorageService storageService;
     private MessagesConfig messagesConfig;
     private WandListener wandListener;
@@ -59,8 +63,11 @@ public class Main extends JavaPlugin {
         messagesConfig.load();
 
         this.rewardDispatcher = new RewardDispatcher(this, storageService);
+        this.rewardEvaluationService = new RewardEvaluationService();
+        this.rewardPersistenceService = new RewardPersistenceService(this, storageService);
         this.zoneManager = new ZoneManager(this, spatialIndex);
-        this.rewardManager = new RewardManager(this, zoneManager, playerTracker, timerService, rewardDispatcher, storageService, messagesConfig);
+        this.rewardManager = new RewardManager(this, zoneManager, playerTracker, timerService, rewardDispatcher,
+                rewardEvaluationService, rewardPersistenceService, storageService, messagesConfig);
 
         rewardManager.loadRewards();
         rewardManager.loadGlobalConfig();
