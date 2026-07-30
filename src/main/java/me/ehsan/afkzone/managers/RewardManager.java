@@ -114,12 +114,50 @@ public class RewardManager {
             plugin.getLogger().info("No reward files found in rewards/ folder");
             return;
         }
+        int loaded = 0;
+        int warnings = 0;
         for (File file : files) {
             String fileName = file.getName();
             String rewardName = fileName.substring(0, fileName.length() - 4); // remove .yml
             YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+
+            // Check for empty/malformed reward file
+            if (config.getKeys(false).isEmpty()) {
+                plugin.getLogger().warning("Reward file '" + fileName + "' is empty or malformed - skipping");
+                warnings++;
+                continue;
+            }
+
             Reward r = new Reward(rewardName);
             r.loadFromConfig(config);
+
+            // Validate amount
+            if (r.getAmount() < 1) {
+                plugin.getLogger().warning("Reward '" + rewardName + "' has invalid amount: " + r.getAmount() + " (must be >= 1). Setting to 1.");
+                r.setAmount(1);
+                warnings++;
+            }
+
+            // Validate interval
+            if (r.getIntervalSeconds() < 0) {
+                plugin.getLogger().warning("Reward '" + rewardName + "' has negative interval_seconds: " + r.getIntervalSeconds() + ". Setting to 0.");
+                r.setIntervalSeconds(0);
+                warnings++;
+            }
+
+            // Validate once_after
+            if (r.getOnceAfterSeconds() < 0) {
+                plugin.getLogger().warning("Reward '" + rewardName + "' has negative once_after_seconds: " + r.getOnceAfterSeconds() + ". Setting to 0.");
+                r.setOnceAfterSeconds(0);
+                warnings++;
+            }
+
+            // Validate priority
+            if (r.getPriority() < 0) {
+                plugin.getLogger().warning("Reward '" + rewardName + "' has negative priority: " + r.getPriority() + ". Setting to 0.");
+                r.setPriority(0);
+                warnings++;
+            }
 
             // Load item stack from the "item" section
             if (config.isConfigurationSection("item")) {
@@ -127,13 +165,26 @@ public class RewardManager {
                 if (itemSection != null) {
                     Map<String, Object> itemData = itemSection.getValues(true);
                     ItemStack item = Reward.deserializeItem(itemData);
+                    if (item == null) {
+                        plugin.getLogger().warning("Reward '" + rewardName + "' has corrupted item data in the 'item' section - reward will not give any item.");
+                        warnings++;
+                    }
                     r.setItemStack(item);
                 }
+            } else {
+                plugin.getLogger().warning("Reward '" + rewardName + "' has no 'item' section. Use /afkzone reward save " + rewardName + " while holding an item to fix this.");
+                warnings++;
+            }
+
+            // Warn if both interval and once_after are 0 (reward never triggers automatically)
+            if (r.getIntervalSeconds() == 0 && r.getOnceAfterSeconds() == 0) {
+                plugin.getLogger().warning("Reward '" + rewardName + "' has both interval_seconds=0 and once_after_seconds=0. It will never trigger automatically (only via /afkzone reward give).");
             }
 
             rewards.put(rewardName, r);
+            loaded++;
         }
-        plugin.getLogger().info("Loaded " + rewards.size() + " rewards from rewards/ folder");
+        plugin.getLogger().info("Loaded " + loaded + " rewards from rewards/ folder" + (warnings > 0 ? " (" + warnings + " warnings)" : ""));
     }
 
     /**
@@ -201,9 +252,31 @@ public class RewardManager {
     public void loadGlobalConfig() {
         FileConfiguration cfg = plugin.getConfig();
 
-        this.onMultiple = cfg.getString("global.on_multiple", "all");
+        // Validate on_multiple
+        String rawOnMultiple = cfg.getString("global.on_multiple", "all");
+        if (!"all".equalsIgnoreCase(rawOnMultiple) && !"highest".equalsIgnoreCase(rawOnMultiple)) {
+            plugin.getLogger().warning("Invalid global.on_multiple value: '" + rawOnMultiple + "'. Expected 'all' or 'highest'. Using default: 'all'.");
+            this.onMultiple = "all";
+        } else {
+            this.onMultiple = rawOnMultiple;
+        }
+
         this.resetProgressOnLeave = cfg.getBoolean("global.reset_progress_on_leave", true);
-        this.afkThresholdSeconds = Math.max(0, cfg.getInt("global.afk_threshold_seconds", 0));
+
+        // Validate afk_threshold_seconds
+        int rawThreshold = cfg.getInt("global.afk_threshold_seconds", 0);
+        if (rawThreshold < 0) {
+            plugin.getLogger().warning("Invalid global.afk_threshold_seconds: " + rawThreshold + " (negative). Setting to 0.");
+            this.afkThresholdSeconds = 0;
+        } else {
+            this.afkThresholdSeconds = rawThreshold;
+        }
+
+        // Validate storage backend
+        String storageType = cfg.getString("global.storage", "sqlite");
+        if (!"sqlite".equalsIgnoreCase(storageType) && !"memory".equalsIgnoreCase(storageType)) {
+            plugin.getLogger().warning("Invalid global.storage: '" + storageType + "'. Expected 'sqlite' or 'memory'. Using default: 'sqlite'.");
+        }
         this.enterSound = MessageUtils.parseSound(cfg.getString("global.enter_sound", "ENTITY_PLAYER_LEVELUP"),
                 plugin.getLogger(), "global.enter_sound");
         this.exitSound = MessageUtils.parseSound(cfg.getString("global.exit_sound", "ENTITY_ITEM_BREAK"),

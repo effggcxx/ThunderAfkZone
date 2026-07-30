@@ -39,21 +39,60 @@ public class ZoneManager implements ZoneService {
     }
 
     /**
-     * Rebuilds the spatial index from the zones config.
+     * Rebuilds the spatial index from the zones config, with validation warnings.
      */
     private void rebuildSpatialIndex() {
         spatialIndex.clear();
         if (zonesConfig == null || !zonesConfig.isConfigurationSection("zones")) return;
+        int loaded = 0;
+        int warnings = 0;
         for (String key : zonesConfig.getConfigurationSection("zones").getKeys(false)) {
             String path = "zones." + key;
             String world = zonesConfig.getString(path + ".world", "");
+
+            // Validate world name
+            if (world == null || world.isEmpty()) {
+                plugin.getLogger().warning("Zone '" + key + "' has no world configured. Skipping.");
+                warnings++;
+                continue;
+            }
+
+            // Validate coordinates exist
+            if (!zonesConfig.isSet(path + ".x1") || !zonesConfig.isSet(path + ".y1") || !zonesConfig.isSet(path + ".z1") ||
+                !zonesConfig.isSet(path + ".x2") || !zonesConfig.isSet(path + ".y2") || !zonesConfig.isSet(path + ".z2")) {
+                plugin.getLogger().warning("Zone '" + key + "' has missing coordinates. Skipping.");
+                warnings++;
+                continue;
+            }
+
             int x1 = zonesConfig.getInt(path + ".x1");
             int y1 = zonesConfig.getInt(path + ".y1");
             int z1 = zonesConfig.getInt(path + ".z1");
             int x2 = zonesConfig.getInt(path + ".x2");
             int y2 = zonesConfig.getInt(path + ".y2");
             int z2 = zonesConfig.getInt(path + ".z2");
+
+            // Validate zone has non-zero size
+            if (x1 == x2 && y1 == y2 && z1 == z2) {
+                plugin.getLogger().warning("Zone '" + key + "' has zero size (all corners are the same point). Skipping.");
+                warnings++;
+                continue;
+            }
+
+            // Check for invalid coordinates (NaN or extreme values)
+            if (Math.abs(x1) > 30000000 || Math.abs(x2) > 30000000 ||
+                Math.abs(y1) > 30000000 || Math.abs(y2) > 30000000 ||
+                Math.abs(z1) > 30000000 || Math.abs(z2) > 30000000) {
+                plugin.getLogger().warning("Zone '" + key + "' has coordinates outside the valid world range. Skipping.");
+                warnings++;
+                continue;
+            }
+
             spatialIndex.addZone(key, world, x1, y1, z1, x2, y2, z2);
+            loaded++;
+        }
+        if (warnings > 0) {
+            plugin.getLogger().warning("Loaded " + loaded + " zones from zones.yml (" + warnings + " warnings)");
         }
     }
 
