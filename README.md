@@ -1,4 +1,4 @@
-# ThunderAfkZone 
+# ThunderAfkZone
 
 A Paper 1.21+ plugin for AFK reward zones: define cuboid regions with the
 built-in selection wand, give players rewards for staying AFK inside them,
@@ -18,6 +18,8 @@ and track statistics per player and per zone.
   global reward pool; optionally restrict specific zones to a subset of rewards.
 - **Per-zone enter/exit commands** — run arbitrary console commands when a
   player enters or leaves a zone.
+- **Zone border particles** — toggle a particle outline of nearby zones
+  (`/afkzone border`), visible only to you.
 - **Overlap protection** — creating a zone that overlaps an existing one is
   blocked with a clear error naming the conflicting zone.
 - **Fully configurable messages** — every player-facing message (enter, exit,
@@ -127,7 +129,7 @@ All commands are under `/afkzone` (aliases: `/taz`, `/thunderafk`).
 
 By default (`afk_threshold_seconds: 0`), simply being inside a zone counts as
 AFK and reward progress starts immediately. Set this above `0` if you want to
-require genuine idling instead - progress will only advance once a player has
+require genuine idling instead — progress will only advance once a player has
 gone that many seconds without any activity inside the zone.
 
 ```yaml
@@ -217,8 +219,8 @@ zones:
 
 ## Messages (`messages.yml`)
 
-Every player-facing message - `enter_zone`, `exit_zone`, `reward_received`,
-`reward_failed`, `inventory_full`, and the `timer` countdown - has its own
+Every player-facing message — `enter_zone`, `exit_zone`, `reward_received`,
+`reward_failed`, `inventory_full`, and the `timer` countdown — has its own
 entry here, each with independent text *and* display mode:
 
 ```yaml
@@ -229,7 +231,7 @@ enter_zone:
 timer:
   text: "<timer> remaining until next reward"
   display: "bossbar"
-  size: "big"                # "big" or "mini" - color/boldness only, not a
+  size: "mini"               # "big" or "mini" - color/boldness only, not a
                               # literal font-size (Minecraft doesn't support
                               # that); applies to whichever display mode above
   title:
@@ -239,14 +241,14 @@ timer:
 ```
 
 Placeholders available: `<zone>`, `<reward>`, `<timer>`, `<player>` (not all
-apply to every message - `<timer>` only makes sense in the `timer` entry).
+apply to every message — `<timer>` only makes sense in the `timer` entry).
 Text is MiniMessage format throughout, same as everywhere else in the plugin.
 `display: "title"` and `"bossbar"` both put the message front-and-center on
 screen rather than in chat; `enter_zone`/`exit_zone` default to `"title"`,
 `timer` defaults to `"bossbar"`, and `reward_received`/`reward_failed`/
 `inventory_full` default to `"chat"` so they don't fight with whatever's
 currently on screen. If a title/bossbar message feels too long to read
-comfortably, shortening the `text` is the most reliable fix - there's no
+comfortably, shortening the `text` is the most reliable fix — there's no
 built-in wrapping.
 
 ## PlaceholderAPI
@@ -283,7 +285,7 @@ wand:
 Changing `wand.item` to something players don't normally hold (an axe or a
 stick, say) avoids any chance of confusion even for staff who forget they're
 holding it. Whatever you pick, only players with `afkzone.wand` are affected
-by clicks with that item - it never touches normal players' tool use.
+by clicks with that item — it never touches normal players' tool use.
 
 The wand itself is named and described in-item (gold "Selection Wand" with
 lore explaining left/right-click) so players don't need to check docs to know
@@ -292,6 +294,7 @@ what it does.
 ## Storage
 
 Set `global.storage` in `config.yml` to:
+
 - `"memory"` — no setup required, but AFK time and reward counts reset on every restart.
 - `"sqlite"` — persists to `afkzone.db` in the plugin's data folder. Requires the
   bundled SQLite driver to load successfully on startup (see Requirements above).
