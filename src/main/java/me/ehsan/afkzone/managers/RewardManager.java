@@ -221,14 +221,56 @@ public class RewardManager {
     }
 
     /**
-     * Deletes a reward file from the rewards/ folder.
+     * Deletes a reward from the in-memory map and removes its YAML file
+     * from the rewards/ folder. Case-insensitive name match.
+     *
+     * @return true if the reward was known (in memory and/or on disk) and cleaned up
      */
     public boolean deleteReward(String name) {
-        File file = getRewardFile(name);
-        if (file.exists()) {
-            return file.delete();
+        boolean removedFromMemory = false;
+        if (rewards.remove(name) != null) {
+            removedFromMemory = true;
         }
-        return false;
+        Iterator<Map.Entry<String, Reward>> it = rewards.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Reward> e = it.next();
+            if (e.getKey().equalsIgnoreCase(name)) {
+                it.remove();
+                removedFromMemory = true;
+            }
+        }
+
+        File file = getRewardFile(name);
+        boolean deletedFile = false;
+        if (file.exists()) {
+            deletedFile = file.delete();
+            if (!deletedFile) {
+                plugin.getLogger().warning("Failed to delete reward file: " + file.getAbsolutePath());
+            }
+        }
+        return removedFromMemory || deletedFile;
+    }
+
+    /**
+     * Sets the enabled flag on an existing reward and persists it to disk.
+     * Case-insensitive name match.
+     *
+     * @return the updated Reward, or null if no reward with that name exists
+     */
+    public Reward setRewardEnabled(String name, boolean enabled) {
+        Reward r = rewards.get(name);
+        if (r == null) {
+            for (Map.Entry<String, Reward> e : rewards.entrySet()) {
+                if (e.getKey().equalsIgnoreCase(name)) {
+                    r = e.getValue();
+                    break;
+                }
+            }
+        }
+        if (r == null) return null;
+        r.setEnabled(enabled);
+        saveReward(r);
+        return r;
     }
 
     /**

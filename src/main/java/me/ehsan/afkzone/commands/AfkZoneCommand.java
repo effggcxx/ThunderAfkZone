@@ -248,9 +248,11 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         msg(sender, "<yellow>/afkzone border [on|off]</yellow> <gray>- Toggle zone border particles (only visible to you)</gray>");
         msg(sender, "");
         msg(sender, "<yellow><bold>Rewards:</bold></yellow>");
-        msg(sender, "<yellow>/afkzone reward save [name] [amount] [interval]</yellow> <gray>- Save held item as a reward</gray>");
+        msg(sender, "<yellow>/afkzone reward save [name] [amount] [interval] [once_after] [priority]</yellow> <gray>- Save held item as a reward</gray>");
         msg(sender, "<yellow>/afkzone reward list</yellow> <gray>- List all saved rewards</gray>");
         msg(sender, "<yellow>/afkzone reward give [name] [player]</yellow> <gray>- Manually give a reward to a player</gray>");
+        msg(sender, "<yellow>/afkzone reward remove [name]</yellow> <gray>- Delete a saved reward</gray>");
+        msg(sender, "<yellow>/afkzone reward enable|disable|toggle [name]</yellow> <gray>- Toggle a reward without deleting it</gray>");
         msg(sender, "<yellow>/afkzone zonereward list [zone]</yellow> <gray>- Show rewards assigned to a zone</gray>");
         msg(sender, "<yellow>/afkzone zonereward add [zone] [reward]</yellow> <gray>- Assign a reward to a zone</gray>");
         msg(sender, "<yellow>/afkzone zonereward remove [zone] [reward]</yellow> <gray>- Remove a reward from a zone</gray>");
@@ -400,22 +402,26 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
 
     private boolean handleRewardCommand(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            msg(sender, "<red>Usage: /afkzone reward list | save [name] [amount] [interval] [once_after] [priority] | give [reward] [player]</red>");
+            msg(sender, "<red>Usage: /afkzone reward <list|save|give|remove|enable|disable|toggle> …</red>");
             msg(sender, "<gray>Use <yellow>/afkzone reward save [name]</yellow> while holding an item to create a reward.</gray>");
             msg(sender, "<gray>Use <yellow>/afkzone reward list</yellow> to see all saved rewards.</gray>");
             return true;
         }
         String act = args[1].toLowerCase(Locale.ROOT);
-        if (act.equals("list")) {
-            return handleRewardList(sender);
-        } else if (act.equals("save")) {
-            return handleRewardSave(sender, args);
-        } else if (act.equals("give")) {
-            return handleRewardGive(sender, args);
-        }
-        msg(sender, "<red>Unknown reward action: <white>" + act + "</white></red>");
-        msg(sender, "<gray>Available actions: list, save, give</gray>");
-        return true;
+        return switch (act) {
+            case "list" -> handleRewardList(sender);
+            case "save" -> handleRewardSave(sender, args);
+            case "give" -> handleRewardGive(sender, args);
+            case "remove", "delete" -> handleRewardRemove(sender, args);
+            case "enable" -> handleRewardSetEnabled(sender, args, true);
+            case "disable" -> handleRewardSetEnabled(sender, args, false);
+            case "toggle" -> handleRewardToggle(sender, args);
+            default -> {
+                msg(sender, "<red>Unknown reward action: <white>" + act + "</white></red>");
+                msg(sender, "<gray>Available: list, save, give, remove, enable, disable, toggle</gray>");
+                yield true;
+            }
+        };
     }
 
     private boolean handleRewardList(CommandSender sender) {
@@ -435,12 +441,20 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             String itemInfo = r.getItemStack() != null
                     ? "<white>" + r.getItemStack().getType().name().toLowerCase() + "</white>"
                     : "<red>no item</red>";
-            String interval = r.getIntervalSeconds() > 0
-                    ? "every " + MessageUtils.formatDuration(r.getIntervalSeconds())
-                    : "once";
+            String timing;
+            if (r.getIntervalSeconds() > 0 && r.getOnceAfterSeconds() > 0) {
+                timing = "every " + MessageUtils.formatDuration(r.getIntervalSeconds())
+                        + " + once after " + MessageUtils.formatDuration(r.getOnceAfterSeconds());
+            } else if (r.getIntervalSeconds() > 0) {
+                timing = "every " + MessageUtils.formatDuration(r.getIntervalSeconds());
+            } else if (r.getOnceAfterSeconds() > 0) {
+                timing = "once after " + MessageUtils.formatDuration(r.getOnceAfterSeconds());
+            } else {
+                timing = "manual only";
+            }
             msg(sender, " <gray>-</gray> <white>" + r.getName() + "</white> " + itemInfo
                     + " <gray>x" + r.getAmount() + "</gray>"
-                    + " <dark_gray>|</dark_gray> " + interval
+                    + " <dark_gray>|</dark_gray> " + timing
                     + " <dark_gray>|</dark_gray> " + status
                     + (r.getDescription().isEmpty() ? "" : " <dark_gray>- " + r.getDescription()));
         }
@@ -540,9 +554,9 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         rewardManager.saveRewardFromItem(name, heldItem, description, amount, interval, onceAfter, priority, true);
 
         if (overwrite) {
-            msg(sender, "<green>Updated reward <yellow>" + name + "</yellow> with your held " + itemDetail + ".<green>");
+            msg(sender, "<green>Updated reward <yellow>" + name + "</yellow> with your held " + itemDetail + ".</green>");
         } else {
-            msg(sender, "<green>Saved reward <yellow>" + name + "</yellow> from your held " + itemDetail + ".<green>");
+            msg(sender, "<green>Saved reward <yellow>" + name + "</yellow> from your held " + itemDetail + ".</green>");
         }
 
         // Build timing description
@@ -602,6 +616,119 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
         rewardManager.getRewardDispatcher().giveRewardToPlayer(r, target);
         msg(sender, "<green>Gave reward <yellow>" + rewardName + "</yellow> to <yellow>" + target.getName() + "</yellow></green>");
+        return true;
+    }
+
+    private boolean handleRewardRemove(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("afkzone.reward.remove")) {
+            msg(sender, "<red>You don't have permission.</red>");
+            return true;
+        }
+        if (args.length < 3) {
+            msg(sender, "<red>Usage: /afkzone reward remove [name]</red>");
+            if (!rewardManager.getRewards().isEmpty()) {
+                msg(sender, "<gray>Available rewards: <white>"
+                        + String.join("</white>, <white>", rewardManager.getRewards().keySet())
+                        + "</white></gray>");
+            }
+            return true;
+        }
+        String name = args[2];
+        boolean known = rewardManager.getRewards().containsKey(name)
+                || rewardManager.getRewards().keySet().stream().anyMatch(k -> k.equalsIgnoreCase(name));
+        if (!known) {
+            msg(sender, "<red>Unknown reward: <white>" + name + "</white></red>");
+            if (!rewardManager.getRewards().isEmpty()) {
+                msg(sender, "<gray>Available rewards: <white>"
+                        + String.join("</white>, <white>", rewardManager.getRewards().keySet())
+                        + "</white></gray>");
+            }
+            return true;
+        }
+        boolean ok = rewardManager.deleteReward(name);
+        if (ok) {
+            msg(sender, "<green>Removed reward <yellow>" + name + "</yellow>.</green>");
+        } else {
+            msg(sender, "<red>Failed to delete reward file for <white>" + name + "</white>.</red>");
+        }
+        return true;
+    }
+
+    private boolean handleRewardSetEnabled(CommandSender sender, String[] args, boolean enabled) {
+        if (!sender.hasPermission("afkzone.reward.toggle")) {
+            msg(sender, "<red>You don't have permission.</red>");
+            return true;
+        }
+        String verb = enabled ? "enable" : "disable";
+        if (args.length < 3) {
+            msg(sender, "<red>Usage: /afkzone reward " + verb + " [name]</red>");
+            if (!rewardManager.getRewards().isEmpty()) {
+                msg(sender, "<gray>Available rewards: <white>"
+                        + String.join("</white>, <white>", rewardManager.getRewards().keySet())
+                        + "</white></gray>");
+            }
+            return true;
+        }
+        String name = args[2];
+        Reward r = rewardManager.setRewardEnabled(name, enabled);
+        if (r == null) {
+            msg(sender, "<red>Unknown reward: <white>" + name + "</white></red>");
+            if (!rewardManager.getRewards().isEmpty()) {
+                msg(sender, "<gray>Available rewards: <white>"
+                        + String.join("</white>, <white>", rewardManager.getRewards().keySet())
+                        + "</white></gray>");
+            }
+            return true;
+        }
+        if (enabled) {
+            msg(sender, "<green>Enabled reward <yellow>" + r.getName() + "</yellow>.</green>");
+        } else {
+            msg(sender, "<yellow>Disabled reward <white>" + r.getName()
+                    + "</white>. It will not fire until re-enabled.</yellow>");
+        }
+        return true;
+    }
+
+    private boolean handleRewardToggle(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("afkzone.reward.toggle")) {
+            msg(sender, "<red>You don't have permission.</red>");
+            return true;
+        }
+        if (args.length < 3) {
+            msg(sender, "<red>Usage: /afkzone reward toggle [name]</red>");
+            if (!rewardManager.getRewards().isEmpty()) {
+                msg(sender, "<gray>Available rewards: <white>"
+                        + String.join("</white>, <white>", rewardManager.getRewards().keySet())
+                        + "</white></gray>");
+            }
+            return true;
+        }
+        String name = args[2];
+        Reward existing = rewardManager.getRewards().get(name);
+        if (existing == null) {
+            for (Map.Entry<String, Reward> e : rewardManager.getRewards().entrySet()) {
+                if (e.getKey().equalsIgnoreCase(name)) {
+                    existing = e.getValue();
+                    break;
+                }
+            }
+        }
+        if (existing == null) {
+            msg(sender, "<red>Unknown reward: <white>" + name + "</white></red>");
+            if (!rewardManager.getRewards().isEmpty()) {
+                msg(sender, "<gray>Available rewards: <white>"
+                        + String.join("</white>, <white>", rewardManager.getRewards().keySet())
+                        + "</white></gray>");
+            }
+            return true;
+        }
+        boolean newState = !existing.isEnabled();
+        rewardManager.setRewardEnabled(existing.getName(), newState);
+        if (newState) {
+            msg(sender, "<green>Enabled reward <yellow>" + existing.getName() + "</yellow>.</green>");
+        } else {
+            msg(sender, "<yellow>Disabled reward <white>" + existing.getName() + "</white>.</yellow>");
+        }
         return true;
     }
 
@@ -1008,7 +1135,9 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                     return filter(new ArrayList<>(zoneManager.getZoneNames()), args[1]);
                 }
                 case "reward" -> {
-                    return filter(Arrays.asList("list", "save", "give"), args[1]);
+                    return filter(Arrays.asList(
+                            "list", "save", "give", "remove", "enable", "disable", "toggle"
+                    ), args[1]);
                 }
                 case "zonereward" -> {
                     return filter(Arrays.asList("list", "add", "remove", "clear"), args[1]);
@@ -1030,14 +1159,17 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 3) {
-            if (sub.equals("reward") && args[1].equalsIgnoreCase("save")) {
-                // Suggest existing reward names (for overwrite) + a hint for new names
-                List<String> suggestions = new ArrayList<>(rewardManager.getRewards().keySet());
-                suggestions.add("<name>");
-                return filter(suggestions, args[2]);
-            }
-            if (sub.equals("reward") && args[1].equalsIgnoreCase("give")) {
-                return filter(new ArrayList<>(rewardManager.getRewards().keySet()), args[2]);
+            if (sub.equals("reward")) {
+                String act = args[1].toLowerCase(Locale.ROOT);
+                if (act.equals("save")) {
+                    List<String> suggestions = new ArrayList<>(rewardManager.getRewards().keySet());
+                    suggestions.add("<name>");
+                    return filter(suggestions, args[2]);
+                }
+                if (act.equals("give") || act.equals("remove") || act.equals("delete")
+                        || act.equals("enable") || act.equals("disable") || act.equals("toggle")) {
+                    return filter(new ArrayList<>(rewardManager.getRewards().keySet()), args[2]);
+                }
             }
             if (sub.equals("zonereward")) {
                 String act = args[1].toLowerCase(Locale.ROOT);
