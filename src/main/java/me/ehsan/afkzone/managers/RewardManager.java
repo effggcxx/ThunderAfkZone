@@ -229,8 +229,9 @@ public class RewardManager {
 
     /**
      * Enables or disables a reward and persists the change.
+     * Returns the updated Reward, or null if no reward with that name exists.
      */
-    public boolean setRewardEnabled(String name, boolean enabled) {
+    public Reward setRewardEnabled(String name, boolean enabled) {
         Reward r = rewards.get(name);
         if (r == null) {
             // Case-insensitive fallback
@@ -241,10 +242,10 @@ public class RewardManager {
                 }
             }
         }
-        if (r == null) return false;
+        if (r == null) return null;
         r.setEnabled(enabled);
         saveReward(r);
-        return true;
+        return r;
     }
 
     /**
