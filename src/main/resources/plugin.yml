@@ -2,7 +2,7 @@ name: ThunderAfkZone
 version: 1.0.0
 main: me.ehsan.afkzone.Main
 api-version: "1.21"
-softdepend: [ItemEdit, PlaceholderAPI]
+softdepend: [PlaceholderAPI]
 # Downloaded by Paper at startup and added to the plugin's classpath - required
 # for global.storage: "sqlite" in config.yml to work (SqliteStorage uses this
 # driver via Class.forName("org.sqlite.JDBC")). Without this, SQLite storage
@@ -41,6 +41,12 @@ permissions:
     default: op
   afkzone.reward.save:
     description: Allows saving a held item as a reward
+    default: op
+  afkzone.reward.remove:
+    description: Allows deleting a saved reward
+    default: op
+  afkzone.reward.toggle:
+    description: Allows enabling, disabling, or toggling a saved reward
     default: op
   afkzone.zonereward.list:
     description: Allows viewing per-zone reward assignments
@@ -87,6 +93,8 @@ permissions:
       afkzone.reward.list: true
       afkzone.reward.give: true
       afkzone.reward.save: true
+      afkzone.reward.remove: true
+      afkzone.reward.toggle: true
       afkzone.zonereward: true
       afkzone.stats: true
       afkzone.stats.others: true
