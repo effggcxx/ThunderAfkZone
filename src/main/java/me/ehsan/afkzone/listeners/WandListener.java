@@ -86,9 +86,13 @@ public class WandListener implements Listener {
                 msg(player, "<gray>Now select position 2 with right-click.</gray>");
             }
         } else if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-            // Position 2 — do NOT cancel so the block interaction (open door,
-            // place block, etc.) still happens. The wand is still detected
-            // and the position is recorded.
+            // Position 2 — cancel the interaction so the wand has no side
+            // effects on the world. This is essential because the wand is a
+            // hoe: without cancelling, right-clicking grass/dirt would till
+            // it into farmland. It also prevents opening doors, placing
+            // blocks, etc. while selecting — the expected behavior for a
+            // selection tool (consistent with left-click being cancelled).
+            event.setCancelled(true);
             sel.setPos2(loc);
             msg(player, "<green>Set position 2 to: <white>" + formatLoc(loc) + "</white></green>");
             if (sel.isComplete()) {
