@@ -17,6 +17,25 @@ wand:
   # something players don't normally hold if you want to avoid any chance
   # of confusion, even for staff who forget they're holding it.
   item: "WOODEN_HOE"
+
+# Border visualization - /afkzone border toggles particle borders around zones.
+# Particles are only visible to the player who enabled them.
+border:
+  # Particle type (Bukkit Particle enum name). Simple particles work best.
+  # Examples: END_ROD, FLAME, HAPPY_VILLAGER, CRIT, HEART, SOUL
+  # Note: particles that require extra data (DUST, BLOCK, ITEM) may not render.
+  particle: "END_ROD"
+  # How often to refresh particles, in ticks (20 ticks = 1 second)
+  interval_ticks: 10
+  # Distance between particles along edges, in blocks (lower = denser)
+  density: 1.0
+  # Maximum distance (in blocks) from a zone center to show its border
+  render_distance: 64
+  # Draw the full 3D box (all 12 edges) or just the ground outline (4 bottom edges)
+  full_box: false
+  # Maximum particles per edge (prevents excessive particles on very large zones)
+  max_particles_per_edge: 200
+
 global:
   # When multiple rewards become eligible at the same second:
   #   "all"     → give every eligible reward

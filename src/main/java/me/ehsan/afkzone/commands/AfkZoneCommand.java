@@ -2,6 +2,7 @@ package me.ehsan.afkzone.commands;
 
 import me.ehsan.afkzone.Main;
 import me.ehsan.afkzone.listeners.WandListener;
+import me.ehsan.afkzone.managers.BorderManager;
 import me.ehsan.afkzone.managers.RewardManager;
 import me.ehsan.afkzone.managers.ZoneManager;
 import me.ehsan.afkzone.models.Reward;
@@ -36,7 +37,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
     private static final List<String> ROOT_SUBS = Arrays.asList(
-            "wand", "sel", "create", "list", "info", "remove", "reload", "reward", "zonereward", "stats", "top"
+            "wand", "sel", "create", "list", "info", "remove", "reload", "reward", "zonereward", "stats", "top", "border"
     );
 
     // Common number suggestions for tab completion
@@ -187,6 +188,43 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 handleTop(sender, args);
                 return true;
             }
+            case "border" -> {
+                if (!(sender instanceof Player player)) {
+                    msg(sender, "<red>Only players can use this command.</red>");
+                    return true;
+                }
+                if (!sender.hasPermission("afkzone.border")) {
+                    msg(sender, "<red>You don't have permission.</red>");
+                    return true;
+                }
+                BorderManager bm = plugin.getBorderManager();
+                if (bm == null) {
+                    msg(sender, "<red>Border system is not available.</red>");
+                    return true;
+                }
+                if (args.length >= 2) {
+                    String mode = args[1].toLowerCase(Locale.ROOT);
+                    if (mode.equals("on") || mode.equals("true") || mode.equals("enable")) {
+                        bm.setEnabled(player, true);
+                        msg(player, "<green>AFK zone border particles enabled.</green>");
+                        msg(player, "<gray>Particles will appear around nearby zones. Run <yellow>/afkzone border off</yellow> to disable.</gray>");
+                        return true;
+                    } else if (mode.equals("off") || mode.equals("false") || mode.equals("disable")) {
+                        bm.setEnabled(player, false);
+                        msg(player, "<yellow>AFK zone border particles disabled.</yellow>");
+                        return true;
+                    }
+                }
+                // Toggle
+                boolean enabled = bm.toggle(player);
+                if (enabled) {
+                    msg(player, "<green>AFK zone border particles enabled.</green>");
+                    msg(player, "<gray>Particles will appear around nearby zones. Run <yellow>/afkzone border</yellow> again to disable.</gray>");
+                } else {
+                    msg(player, "<yellow>AFK zone border particles disabled.</yellow>");
+                }
+                return true;
+            }
             default -> {
                 msg(sender, "<red>Unknown command: <white>" + sub + "</white></red>");
                 msg(sender, "<gray>Use <yellow>/afkzone</yellow> to see all available commands.</gray>");
@@ -207,6 +245,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         msg(sender, "<yellow>/afkzone info [name]</yellow> <gray>- Show zone details and assigned rewards</gray>");
         msg(sender, "<yellow>/afkzone remove [name]</yellow> <gray>- Delete a zone</gray>");
         msg(sender, "<yellow>/afkzone reload</yellow> <gray>- Reload config + zones from disk</gray>");
+        msg(sender, "<yellow>/afkzone border [on|off]</yellow> <gray>- Toggle zone border particles (only visible to you)</gray>");
         msg(sender, "");
         msg(sender, "<yellow><bold>Rewards:</bold></yellow>");
         msg(sender, "<yellow>/afkzone reward save [name] [amount] [interval]</yellow> <gray>- Save held item as a reward</gray>");
@@ -980,6 +1019,9 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 case "stats" -> {
                     // Suggest online player names for stats
                     return null; // null = Bukkit suggests online players
+                }
+                case "border" -> {
+                    return filter(Arrays.asList("on", "off"), args[1]);
                 }
                 default -> {
                     return Collections.emptyList();

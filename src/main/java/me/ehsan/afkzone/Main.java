@@ -4,6 +4,7 @@ import me.ehsan.afkzone.commands.AfkZoneCommand;
 import me.ehsan.afkzone.config.MessagesConfig;
 import me.ehsan.afkzone.listeners.WandListener;
 import me.ehsan.afkzone.listeners.ZoneListener;
+import me.ehsan.afkzone.managers.BorderManager;
 import me.ehsan.afkzone.managers.RewardManager;
 import me.ehsan.afkzone.managers.ZoneManager;
 import me.ehsan.afkzone.placeholder.AfkZoneExpansion;
@@ -33,6 +34,7 @@ public class Main extends JavaPlugin {
     private MessagesConfig messagesConfig;
     private WandListener wandListener;
     private AfkZoneExpansion placeholderExpansion;
+    private BorderManager borderManager;
 
     @Override
     public void onEnable() {
@@ -75,6 +77,11 @@ public class Main extends JavaPlugin {
         // Single global scheduler that ticks all tracked players every second
         rewardManager.startGlobalScheduler();
 
+        // Border particle visualization system
+        this.borderManager = new BorderManager(this, zoneManager);
+        borderManager.loadConfig();
+        borderManager.start();
+
         // Wand selection system
         this.wandListener = new WandListener(this);
         wandListener.loadConfig();
@@ -102,6 +109,9 @@ public class Main extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (borderManager != null) {
+            borderManager.stop();
+        }
         if (rewardManager != null) {
             rewardManager.stopGlobalScheduler();
         }
@@ -126,6 +136,10 @@ public class Main extends JavaPlugin {
         rewardManager.loadGlobalConfig();
 
         zoneManager.reload();
+
+        if (borderManager != null) {
+            borderManager.loadConfig();
+        }
 
         if (wandListener != null) {
             wandListener.loadConfig();
@@ -162,5 +176,9 @@ public class Main extends JavaPlugin {
 
     public WandListener getWandListener() {
         return wandListener;
+    }
+
+    public BorderManager getBorderManager() {
+        return borderManager;
     }
 }

@@ -12,7 +12,7 @@ libraries:
 commands:
   afkzone:
     description: Manage AFK zones
-    usage: /afkzone <create|list|info|remove|reload|reward|zonereward|stats|top>
+    usage: /afkzone <create|list|info|remove|reload|reward|zonereward|stats|top|border>
     aliases: [taz, thunderafk]
 permissions:
   afkzone.wand:
@@ -71,6 +71,9 @@ permissions:
   afkzone.top:
     description: Allows viewing top AFK players
     default: op
+  afkzone.border:
+    description: Allows toggling zone border particle visualization (only visible to self)
+    default: op
   afkzone.admin:
     description: All ThunderAfkZone permissions
     default: op
@@ -88,3 +91,4 @@ permissions:
       afkzone.stats: true
       afkzone.stats.others: true
       afkzone.top: true
+      afkzone.border: true
