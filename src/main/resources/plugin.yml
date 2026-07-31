@@ -63,7 +63,10 @@ permissions:
       afkzone.zonereward.remove: true
       afkzone.zonereward.clear: true
   afkzone.stats:
-    description: Allows viewing AFK statistics
+    description: Allows viewing your own AFK statistics
+    default: op
+  afkzone.stats.others:
+    description: Allows viewing other players' AFK statistics
     default: op
   afkzone.top:
     description: Allows viewing top AFK players
@@ -83,4 +86,5 @@ permissions:
       afkzone.reward.save: true
       afkzone.zonereward: true
       afkzone.stats: true
+      afkzone.stats.others: true
       afkzone.top: true

@@ -19,6 +19,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -226,16 +227,33 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
     private void handleStats(CommandSender sender, String[] args) {
         UUID targetId;
         String targetName;
+        boolean isOtherPlayer = false;
 
         if (args.length >= 2) {
-            Player target = Bukkit.getPlayerExact(args[1]);
-            if (target == null) {
-                msg(sender, "<red>Player not found: <white>" + args[1] + "</white></red>");
-                msg(sender, "<gray>Make sure the player is online.</gray>");
+            // Viewing another player's stats - requires afkzone.stats.others permission
+            if (!sender.hasPermission("afkzone.stats.others")) {
+                msg(sender, "<red>You don't have permission to view other players' stats.</red>");
+                msg(sender, "<gray>Permission required: <white>afkzone.stats.others</white></gray>");
                 return;
             }
-            targetId = target.getUniqueId();
-            targetName = target.getName();
+
+            // Try online player first, then fall back to offline
+            Player onlineTarget = Bukkit.getPlayerExact(args[1]);
+            if (onlineTarget != null) {
+                targetId = onlineTarget.getUniqueId();
+                targetName = onlineTarget.getName();
+            } else {
+                // Try offline player
+                OfflinePlayer offlineTarget = Bukkit.getOfflinePlayer(args[1]);
+                if (offlineTarget == null || (!offlineTarget.hasPlayedBefore() && !offlineTarget.isOnline())) {
+                    msg(sender, "<red>Player not found: <white>" + args[1] + "</white></red>");
+                    msg(sender, "<gray>The player must have logged in at least once.</gray>");
+                    return;
+                }
+                targetId = offlineTarget.getUniqueId();
+                targetName = offlineTarget.getName() != null ? offlineTarget.getName() : args[1];
+            }
+            isOtherPlayer = true;
         } else if (sender instanceof Player p) {
             targetId = p.getUniqueId();
             targetName = p.getName();
@@ -254,6 +272,8 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             String zone = rewardManager.getPlayerTracker().getPlayerZone(targetId);
             msg(sender, "  <gray>Current session: <white>" + MessageUtils.formatDuration(sessionSeconds)
                     + "</white> <dark_gray>(in " + zone + ")</dark_gray></gray>");
+        } else if (isOtherPlayer) {
+            msg(sender, "  <gray>Current session: <dark_gray>not in a zone</dark_gray></gray>");
         }
         msg(sender, "  <gray>Total AFK time: <white>" + MessageUtils.formatDuration(totalAfkTime) + "</white></gray>");
         msg(sender, "  <gray>Rewards received: <white>" + rewardsReceived + "</white></gray>");
