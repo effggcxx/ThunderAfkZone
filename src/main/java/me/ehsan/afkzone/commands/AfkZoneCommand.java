@@ -40,7 +40,9 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
 
     // Common number suggestions for tab completion
     private static final List<String> AMOUNT_SUGGESTIONS = Arrays.asList("1", "2", "4", "8", "16", "32", "64");
-    private static final List<String> INTERVAL_SUGGESTIONS = Arrays.asList("0", "30", "60", "120", "300", "600", "1800", "3600");
+    private static final List<String> INTERVAL_SUGGESTIONS = Arrays.asList("0", "false", "30", "60", "120", "300", "600", "1800", "3600");
+    private static final List<String> ONCE_AFTER_SUGGESTIONS = Arrays.asList("0", "false", "30", "60", "120", "300", "600");
+    private static final List<String> PRIORITY_SUGGESTIONS = Arrays.asList("0", "1", "5", "10");
 
     public AfkZoneCommand(Main plugin, ZoneManager zoneManager, RewardManager rewardManager) {
         this.plugin = plugin;
@@ -320,11 +322,26 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    /**
+     * Parses a time argument (interval or once_after) that may be "false" or a number.
+     * "false" and "0" both return 0 (disabled). Non-numeric values return the default.
+     */
+    private int parseTimeArg(String[] args, int index, int def) {
+        if (args.length <= index) return def;
+        String val = args[index].toLowerCase(Locale.ROOT);
+        if ("false".equals(val)) return 0;
+        try {
+            return Integer.parseInt(val);
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
     // --- Reward command ---
 
     private boolean handleRewardCommand(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            msg(sender, "<red>Usage: /afkzone reward list | save [name] [amount] [interval] | give [reward] [player]</red>");
+            msg(sender, "<red>Usage: /afkzone reward list | save [name] [amount] [interval] [once_after] [priority] | give [reward] [player]</red>");
             msg(sender, "<gray>Use <yellow>/afkzone reward save [name]</yellow> while holding an item to create a reward.</gray>");
             msg(sender, "<gray>Use <yellow>/afkzone reward list</yellow> to see all saved rewards.</gray>");
             return true;
@@ -381,12 +398,17 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length < 3) {
-            msg(sender, "<red>Usage: /afkzone reward save [name] [amount] [interval]</red>");
+            msg(sender, "<red>Usage: /afkzone reward save [name] [amount] [interval] [once_after] [priority]</red>");
             msg(sender, "<gray>Hold the item you want to save in your hand, then run this command.</gray>");
-            msg(sender, "<gray>  [name]     - a name for this reward (e.g. welcome_diamond)</gray>");
-            msg(sender, "<gray>  [amount]   - how many items to give each time (default: 1)</gray>");
-            msg(sender, "<gray>  [interval] - give every X seconds; 0 = give once (default: 0)</gray>");
-            msg(sender, "<gray>Example: hold a diamond, <yellow>/afkzone reward save welcome_diamond 1 300</yellow></gray>");
+            msg(sender, "<gray>  [name]       - a name for this reward (e.g. welcome_diamond)</gray>");
+            msg(sender, "<gray>  [amount]     - how many items to give each time (default: 1)</gray>");
+            msg(sender, "<gray>  [interval]   - give every X seconds, or 0/false to disable (default: 0)</gray>");
+            msg(sender, "<gray>  [once_after] - give once after X seconds, or 0/false to disable (default: 0)</gray>");
+            msg(sender, "<gray>  [priority]   - higher = preferred when on_multiple=highest (default: 0)</gray>");
+            msg(sender, "<gray>Examples:</gray>");
+            msg(sender, "<gray>  <yellow>/afkzone reward save welcome_diamond 1 300</yellow> - give 1 diamond every 5 min</gray>");
+            msg(sender, "<gray>  <yellow>/afkzone reward save starter_kit 1 false 60</yellow> - give 1 sword once after 60s</gray>");
+            msg(sender, "<gray>  <yellow>/afkzone reward save vip_kit 1 300 60 10</yellow> - give once after 60s, then every 5 min</gray>");
             return true;
         }
 
@@ -416,7 +438,9 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
 
         int amount = args.length >= 4 ? parseInt(args[3], 1) : 1;
-        int interval = args.length >= 5 ? parseInt(args[4], 0) : 0;
+        int interval = parseTimeArg(args, 4, 0);
+        int onceAfter = parseTimeArg(args, 5, 0);
+        int priority = args.length >= 7 ? parseInt(args[6], 0) : 0;
 
         if (amount < 1) {
             msg(sender, "<red>Amount must be at least 1.</red>");
@@ -424,6 +448,19 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
         if (interval < 0) {
             msg(sender, "<red>Interval cannot be negative.</red>");
+            return true;
+        }
+        if (onceAfter < 0) {
+            msg(sender, "<red>Once-after cannot be negative.</red>");
+            return true;
+        }
+
+        // Validate that at least one of interval or once_after is set
+        if (interval == 0 && onceAfter == 0) {
+            msg(sender, "<red>You must set at least one of [interval] or [once_after].</red>");
+            msg(sender, "<gray>Use <white>0</white> or <white>false</white> to disable one, but not both.</gray>");
+            msg(sender, "<gray>Example: <yellow>/afkzone reward save welcome_diamond 1 300</yellow> (interval every 5 min)</gray>");
+            msg(sender, "<gray>Example: <yellow>/afkzone reward save starter_kit 1 false 60</yellow> (once after 60s)</gray>");
             return true;
         }
 
@@ -441,14 +478,26 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         if (overwrite) {
             msg(sender, "<yellow>Reward <white>" + name + "</white> already exists. It will be overwritten.</yellow>");
         }
-        rewardManager.saveRewardFromItem(name, heldItem, description, amount, interval, 0, 0, true);
+        rewardManager.saveRewardFromItem(name, heldItem, description, amount, interval, onceAfter, priority, true);
 
         if (overwrite) {
             msg(sender, "<green>Updated reward <yellow>" + name + "</yellow> with your held " + itemDetail + ".<green>");
         } else {
             msg(sender, "<green>Saved reward <yellow>" + name + "</yellow> from your held " + itemDetail + ".<green>");
         }
-        msg(sender, "<gray>Amount: <white>" + amount + "</white> <dark_gray>|</dark_gray> Interval: <white>" + (interval > 0 ? "every " + MessageUtils.formatDuration(interval) : "once (given when player enters the zone)") + "</white></gray>");
+
+        // Build timing description
+        StringBuilder timing = new StringBuilder();
+        if (interval > 0) {
+            timing.append("every ").append(MessageUtils.formatDuration(interval));
+        }
+        if (onceAfter > 0) {
+            if (timing.length() > 0) timing.append(" + ");
+            timing.append("once after ").append(MessageUtils.formatDuration(onceAfter));
+        }
+        if (timing.length() == 0) timing.append("manual only");
+
+        msg(sender, "<gray>Amount: <white>" + amount + "</white> <dark_gray>|</dark_gray> Timing: <white>" + timing.toString() + "</white> <dark_gray>|</dark_gray> Priority: <white>" + priority + "</white></gray>");
         return true;
     }
 
@@ -969,6 +1018,20 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             if (sub.equals("reward") && args[1].equalsIgnoreCase("save")) {
                 // Suggest intervals
                 return filter(INTERVAL_SUGGESTIONS, args[4]);
+            }
+        }
+
+        if (args.length == 6) {
+            if (sub.equals("reward") && args[1].equalsIgnoreCase("save")) {
+                // Suggest once_after values
+                return filter(ONCE_AFTER_SUGGESTIONS, args[5]);
+            }
+        }
+
+        if (args.length == 7) {
+            if (sub.equals("reward") && args[1].equalsIgnoreCase("save")) {
+                // Suggest priority values
+                return filter(PRIORITY_SUGGESTIONS, args[6]);
             }
         }
 
