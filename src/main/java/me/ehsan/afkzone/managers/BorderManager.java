@@ -12,6 +12,8 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 
 /**
  * Manages per-player zone border particle visualization.
@@ -32,8 +34,11 @@ public class BorderManager {
     private int intervalTicks = 10;
     private double density = 1.0;
     private double renderDistance = 64.0;
-    private boolean fullBox = false;
+    private boolean fullBox = true;
     private int maxParticlesPerEdge = 200;
+
+    /** Log particle spawn failures at most once per session to avoid spam. */
+    private final AtomicBoolean particleFailureLogged = new AtomicBoolean(false);
 
     public BorderManager(Main plugin, ZoneManager zoneManager) {
         this.plugin = plugin;
@@ -62,11 +67,17 @@ public class BorderManager {
         if (this.density < 0.1) this.density = 0.1;
 
         this.renderDistance = plugin.getConfig().getDouble("border.render_distance", 64.0);
+        if (this.renderDistance < 1.0) this.renderDistance = 1.0;
 
-        this.fullBox = plugin.getConfig().getBoolean("border.full_box", false);
+        // Default true so borders are visible as a full cuboid, not just the
+        // often-underground bottom face at y1.
+        this.fullBox = plugin.getConfig().getBoolean("border.full_box", true);
 
         this.maxParticlesPerEdge = plugin.getConfig().getInt("border.max_particles_per_edge", 200);
         if (this.maxParticlesPerEdge < 1) this.maxParticlesPerEdge = 1;
+
+        // Allow logging a particle failure again after a reload
+        particleFailureLogged.set(false);
 
         // Restart the scheduler if it's running so a changed interval takes effect
         if (task != null) {
@@ -92,6 +103,7 @@ public class BorderManager {
             task.cancel();
             task = null;
         }
+        enabledPlayers.clear();
     }
 
     /**
@@ -139,8 +151,8 @@ public class BorderManager {
             try {
                 renderForPlayer(player);
             } catch (Exception e) {
-                plugin.getLogger().warning("Error rendering border for "
-                        + player.getName() + ": " + e.getMessage());
+                plugin.getLogger().log(Level.WARNING,
+                        "Error rendering border for " + player.getName(), e);
             }
         }
     }
@@ -154,27 +166,56 @@ public class BorderManager {
             // Skip zones in other worlds
             if (!b.world().equals(playerWorld.getName())) continue;
 
-            // Skip zones whose center is too far away
-            double cx = (b.x1() + b.x2()) / 2.0;
-            double cy = (b.y1() + b.y2()) / 2.0;
-            double cz = (b.z1() + b.z2()) / 2.0;
-            double distSq = playerLoc.distanceSquared(new Location(playerWorld, cx, cy, cz));
-            if (distSq > renderDistSq) continue;
+            // Distance to nearest point on the AABB — not the center, so large
+            // zones still show borders when the player is near an edge.
+            if (distanceSquaredToBox(playerLoc, b) > renderDistSq) continue;
 
             drawZoneBox(player, playerWorld, b);
         }
     }
 
     /**
-     * Draws the zone border as particles. By default only the 4 bottom
-     * (ground) edges are drawn; if full_box is enabled, all 12 edges of the
-     * cuboid are drawn.
+     * Squared distance from a location to the nearest point on the zone's
+     * axis-aligned bounding box. Zero if the player is inside the box.
+     */
+    private static double distanceSquaredToBox(Location loc, SpatialZoneIndex.ZoneBounds b) {
+        double px = loc.getX();
+        double py = loc.getY();
+        double pz = loc.getZ();
+
+        // Inclusive block bounds → continuous [min, max+1) volume matching how
+        // particles are centered at block + 0.5 along each edge.
+        double minX = b.x1();
+        double maxX = b.x2() + 1.0;
+        double minY = b.y1();
+        double maxY = b.y2() + 1.0;
+        double minZ = b.z1();
+        double maxZ = b.z2() + 1.0;
+
+        double dx = 0.0;
+        if (px < minX) dx = minX - px;
+        else if (px > maxX) dx = px - maxX;
+
+        double dy = 0.0;
+        if (py < minY) dy = minY - py;
+        else if (py > maxY) dy = py - maxY;
+
+        double dz = 0.0;
+        if (pz < minZ) dz = minZ - pz;
+        else if (pz > maxZ) dz = pz - maxZ;
+
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    /**
+     * Draws the zone border as particles. By default all 12 edges of the
+     * cuboid are drawn; if full_box is false, only the 4 bottom edges are drawn.
      */
     private void drawZoneBox(Player player, World world, SpatialZoneIndex.ZoneBounds b) {
         int x1 = b.x1(), y1 = b.y1(), z1 = b.z1();
         int x2 = b.x2(), y2 = b.y2(), z2 = b.z2();
 
-        // Bottom edges (y = y1) - always drawn
+        // Bottom edges (y = y1)
         drawEdge(player, world, x1, y1, z1, x2, y1, z1);
         drawEdge(player, world, x1, y1, z2, x2, y1, z2);
         drawEdge(player, world, x1, y1, z1, x1, y1, z2);
@@ -213,10 +254,26 @@ public class BorderManager {
             loc.setX(x1 + dx * t + 0.5);
             loc.setY(y1 + dy * t + 0.5);
             loc.setZ(z1 + dz * t + 0.5);
-            try {
-                player.spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-            } catch (Exception ignored) {
-                // Some particles require additional data; skip if they fail
+            spawnParticleSafe(player, loc);
+        }
+    }
+
+    /**
+     * Spawns a particle for a single player with force=true so it is not
+     * culled by the normal client particle range. Logs the first failure
+     * (e.g. particle needs data) instead of failing silently forever.
+     */
+    private void spawnParticleSafe(Player player, Location loc) {
+        try {
+            // force=true: always send to this player regardless of distance/settings
+            player.spawnParticle(particle, loc, 1, 0, 0, 0, 0, null, true);
+        } catch (Exception e) {
+            if (particleFailureLogged.compareAndSet(false, true)) {
+                plugin.getLogger().log(Level.WARNING,
+                        "Failed to spawn border particle '" + particle.name()
+                                + "'. Try a simple type like END_ROD, FLAME, or CRIT in border.particle. "
+                                + "Particles that need extra data (DUST, BLOCK, ITEM) are not supported.",
+                        e);
             }
         }
     }

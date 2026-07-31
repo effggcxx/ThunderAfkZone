@@ -29,10 +29,11 @@ border:
   interval_ticks: 10
   # Distance between particles along edges, in blocks (lower = denser)
   density: 1.0
-  # Maximum distance (in blocks) from a zone center to show its border
+  # Maximum distance (in blocks) from a zone's nearest edge/face to show its border
   render_distance: 64
-  # Draw the full 3D box (all 12 edges) or just the ground outline (4 bottom edges)
-  full_box: false
+  # Draw the full 3D box (all 12 edges) or just the ground outline (4 bottom edges).
+  # Default true so borders are visible even when y1 is underground.
+  full_box: true
   # Maximum particles per edge (prevents excessive particles on very large zones)
   max_particles_per_edge: 200
 
