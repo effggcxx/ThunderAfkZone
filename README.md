@@ -1,4 +1,4 @@
-# ThunderAfkZone ( not ready to use yet )
+# ThunderAfkZone 
 
 A Paper 1.21+ plugin for AFK reward zones: define cuboid regions with the
 built-in selection wand, give players rewards for staying AFK inside them,
@@ -12,6 +12,8 @@ and track statistics per player and per zone.
   save it as a reward (full NBT/enchants/lore preserved), and set it to repeat
   on an interval or fire once. Given via direct inventory delivery, with
   overflow dropped naturally if the player's inventory is full.
+- **Enable / disable / remove rewards in-game** — pause or delete rewards
+  without touching files.
 - **Per-zone reward restrictions** — by default every zone shares the same
   global reward pool; optionally restrict specific zones to a subset of rewards.
 - **Per-zone enter/exit commands** — run arbitrary console commands when a
@@ -48,9 +50,10 @@ failed initialization, switch to `storage: "memory"` until it's resolved.
 
 1. Drop the built jar into your server's `plugins/` folder.
 2. Start the server once to generate `config.yml` and `zones.yml`.
-3. Edit `config.yml` to set up your rewards, then reload or restart.
+3. Edit `config.yml` if needed, then reload or restart.
 4. Run `/afkzone wand` to get the selection tool and create your first zone
    (see below).
+5. Hold an item and run `/afkzone reward save <name> ...` to create rewards.
 
 ## Creating a zone with the wand
 
@@ -84,15 +87,18 @@ All commands are under `/afkzone` (aliases: `/taz`, `/thunderafk`).
 | `/afkzone info <name>` | Show a zone's coordinates and which rewards apply there |
 | `/afkzone remove <name>` | Delete a zone |
 | `/afkzone reload` | Reload config.yml, messages.yml, and zones.yml |
-| `/afkzone reward save <name> [amount] [interval]` | Save the item in your hand as a reward (see below) |
-| `/afkzone reward list` | List all saved rewards, their item, amount, and timing |
+| `/afkzone reward save <name> [amount] [interval] [once_after] [priority]` | Save the item in your hand as a reward |
+| `/afkzone reward list` | List all saved rewards, their item, amount, timing, and status |
 | `/afkzone reward give <reward> [player]` | Manually give a reward |
+| `/afkzone reward remove <name>` | Delete a saved reward |
+| `/afkzone reward enable\|disable\|toggle <name>` | Enable/disable a reward without deleting it |
 | `/afkzone zonereward list <zone>` | Show which rewards are restricted to a zone |
 | `/afkzone zonereward add <zone> <reward>` | Restrict a reward to a specific zone |
 | `/afkzone zonereward remove <zone> <reward>` | Remove a reward restriction |
 | `/afkzone zonereward clear <zone>` | Clear all restrictions (zone uses all global rewards again) |
 | `/afkzone stats [player]` | Show current session + lifetime AFK time and rewards received |
 | `/afkzone top [time\|rewards]` | Show the leaderboard for AFK time or rewards received |
+| `/afkzone border [on\|off]` | Toggle zone border particles (only visible to you) |
 
 ## Permissions
 
@@ -106,10 +112,15 @@ All commands are under `/afkzone` (aliases: `/taz`, `/thunderafk`).
 | `afkzone.reload` | op | Reloading config |
 | `afkzone.reward.list` | op | Listing rewards |
 | `afkzone.reward.give` | op | Manually giving rewards |
+| `afkzone.reward.save` | op | Saving held items as rewards |
+| `afkzone.reward.remove` | op | Deleting saved rewards |
+| `afkzone.reward.toggle` | op | Enabling/disabling rewards |
 | `afkzone.zonereward.*` | op | Per-zone reward assignment (`list`/`add`/`remove`/`clear`) |
 | `afkzone.zonereward` | op | All of the above `zonereward.*` sub-permissions |
-| `afkzone.stats` | op | Viewing AFK statistics |
+| `afkzone.stats` | op | Viewing your own AFK statistics |
+| `afkzone.stats.others` | op | Viewing other players' AFK statistics |
 | `afkzone.top` | op | Viewing leaderboards |
+| `afkzone.border` | op | Toggling zone border particles |
 | `afkzone.admin` | op | Every permission above, bundled |
 
 ## AFK threshold
@@ -139,39 +150,43 @@ zones:
 
 ## Configuring rewards
 
-Rewards are no longer defined in `config.yml` — they're created in-game and
-stored as individual files under `plugins/ThunderAfkZone/rewards/`.
+Rewards are created in-game and stored as individual files under
+`plugins/ThunderAfkZone/rewards/`.
 
 1. Hold the item you want to give as a reward.
-2. Run `/afkzone reward save <name> [amount] [interval]`:
+2. Run `/afkzone reward save <name> [amount] [interval] [once_after] [priority]`:
    - `amount` — how many of the item to give per delivery (default `1`)
-   - `interval` — give every `interval` seconds of AFK time (default `0`)
-3. That's it — the exact item is saved (enchants, custom name, lore, and all
-   other NBT included), and it starts applying to every zone immediately.
+   - `interval` — give every N seconds of AFK time (`0` / `false` = off)
+   - `once_after` — give once after N seconds of AFK time (`0` / `false` = off)
+   - `priority` — only matters when `global.on_multiple: "highest"`
+3. At least one of `interval` or `once_after` must be > 0 (both zero is rejected —
+   that combination can never fire automatically).
 
 ```
-/afkzone reward save welcome_diamond 1 300   → 1 diamond every 5 minutes AFK
+/afkzone reward save welcome_diamond 1 300          → every 5 minutes
+/afkzone reward save starter_kit 1 false 60         → once after 60s
+/afkzone reward save vip_kit 1 300 60 10            → once after 60s, then every 5 min
 ```
 
-`priority` only matters if `global.on_multiple: "highest"` in `config.yml` —
-otherwise every eligible reward is given at once. There's currently no
-in-game command to remove or disable a saved reward — deleting its file from
-the `rewards/` folder is the only way, until that's added.
+Manage existing rewards without touching files:
 
-**Known issue:** the help text for `/afkzone reward save` says an `interval`
-of `0` means "give once," but that's not actually implemented yet — a
-reward saved with `interval: 0` never fires (it needs `once_after_seconds`
-set, which this command doesn't currently expose). Until this is fixed, only
-use a real positive `interval` value.
+```
+/afkzone reward list
+/afkzone reward remove <name>
+/afkzone reward disable <name>
+/afkzone reward enable <name>
+/afkzone reward toggle <name>
+```
 
 **Leaving a zone resets reward progress by default.** Interval counters
 restart from zero every time a player leaves and re-enters, even a couple of
 seconds later. If that's too punishing for your setup, set
 `global.reset_progress_on_leave: false` in `config.yml` to keep progress
-in memory across zone visits (a full restart still clears it). Note that the
-current-session timer (`%afkzone_time%`, and the "Current session" line in
-`/afkzone stats`) always resets on leaving regardless of this setting — it's
-tracking time in the zone right now, not reward progress.
+in memory across zone visits (a full restart still clears it unless SQLite
+persistence is on). Note that the current-session timer (`%afkzone_time%`,
+and the "Current session" line in `/afkzone stats`) always resets on leaving
+regardless of this setting — it's tracking time in the zone right now, not
+reward progress.
 
 ## Zones and per-zone options (`zones.yml`)
 
