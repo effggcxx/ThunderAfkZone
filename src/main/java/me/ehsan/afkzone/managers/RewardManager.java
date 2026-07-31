@@ -9,7 +9,6 @@ import me.ehsan.afkzone.storage.StorageService;
 import me.ehsan.afkzone.util.MessageUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -165,18 +164,15 @@ public class RewardManager {
                 warnings++;
             }
 
-            // Load item stack from the "item" section
-            if (config.isConfigurationSection("item")) {
-                ConfigurationSection itemSection = config.getConfigurationSection("item");
-                if (itemSection != null) {
-                    Map<String, Object> itemData = itemSection.getValues(true);
-                    ItemStack item = Reward.deserializeItem(itemData);
-                    if (item == null) {
-                        plugin.getLogger().warning("Reward '" + rewardName + "' has corrupted item data in the 'item' section - reward will not give any item.");
-                        warnings++;
-                    }
-                    r.setItemStack(item);
+            // Load ItemStack via Bukkit's ConfigurationSerializable path (not manual
+            // serialize + getValues(true), which flattens nested meta and corrupts items).
+            if (config.contains("item")) {
+                ItemStack item = config.getItemStack("item");
+                if (item == null) {
+                    plugin.getLogger().warning("Reward '" + rewardName + "' has corrupted item data in the 'item' section - reward will not give any item.");
+                    warnings++;
                 }
+                r.setItemStack(item);
             } else {
                 plugin.getLogger().warning("Reward '" + rewardName + "' has no 'item' section. Use /afkzone reward save " + rewardName + " while holding an item to fix this.");
                 warnings++;
@@ -204,13 +200,9 @@ public class RewardManager {
         // Save config fields
         reward.saveToConfig(config);
 
-        // Save item stack data
+        // Save ItemStack natively — preserves nested meta/NBT across restarts
         if (reward.getItemStack() != null) {
-            Map<String, Object> itemData = reward.serializeItem();
-            ConfigurationSection itemSection = config.createSection("item");
-            for (Map.Entry<String, Object> entry : itemData.entrySet()) {
-                itemSection.set(entry.getKey(), entry.getValue());
-            }
+            config.set("item", reward.getItemStack());
         }
 
         try {
@@ -221,45 +213,27 @@ public class RewardManager {
     }
 
     /**
-     * Deletes a reward from the in-memory map and removes its YAML file
-     * from the rewards/ folder. Case-insensitive name match.
-     *
-     * @return true if the reward was known (in memory and/or on disk) and cleaned up
+     * Deletes a reward file from the rewards/ folder and removes it from memory.
      */
     public boolean deleteReward(String name) {
-        boolean removedFromMemory = false;
-        if (rewards.remove(name) != null) {
-            removedFromMemory = true;
-        }
-        Iterator<Map.Entry<String, Reward>> it = rewards.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<String, Reward> e = it.next();
-            if (e.getKey().equalsIgnoreCase(name)) {
-                it.remove();
-                removedFromMemory = true;
-            }
-        }
-
+        String key = name.toLowerCase(Locale.ROOT);
+        // Try both original and lowercased keys in memory
+        rewards.remove(name);
+        rewards.remove(key);
         File file = getRewardFile(name);
-        boolean deletedFile = false;
         if (file.exists()) {
-            deletedFile = file.delete();
-            if (!deletedFile) {
-                plugin.getLogger().warning("Failed to delete reward file: " + file.getAbsolutePath());
-            }
+            return file.delete();
         }
-        return removedFromMemory || deletedFile;
+        return false;
     }
 
     /**
-     * Sets the enabled flag on an existing reward and persists it to disk.
-     * Case-insensitive name match.
-     *
-     * @return the updated Reward, or null if no reward with that name exists
+     * Enables or disables a reward and persists the change.
      */
-    public Reward setRewardEnabled(String name, boolean enabled) {
+    public boolean setRewardEnabled(String name, boolean enabled) {
         Reward r = rewards.get(name);
         if (r == null) {
+            // Case-insensitive fallback
             for (Map.Entry<String, Reward> e : rewards.entrySet()) {
                 if (e.getKey().equalsIgnoreCase(name)) {
                     r = e.getValue();
@@ -267,10 +241,10 @@ public class RewardManager {
                 }
             }
         }
-        if (r == null) return null;
+        if (r == null) return false;
         r.setEnabled(enabled);
         saveReward(r);
-        return r;
+        return true;
     }
 
     /**
