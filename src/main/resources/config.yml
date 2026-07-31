@@ -93,14 +93,19 @@ global:
 # create rewards in-game. They are saved in the rewards/
 # folder as individual YAML files.
 #
-# Example:
+# Examples:
 #   /afkzone reward save welcome_diamond 1 300
-#   - saves the item in your hand as "welcome_diamond"
-#   - amount: 1, interval: 300s (give every 5 minutes)
-#   - /afkzone reward save starter_kit 1 0
-#   - saves the item as "starter_kit" (given once when player enters zone)
+#     → 1 of held item every 5 minutes of AFK
+#   /afkzone reward save starter_kit 1 false 60
+#     → 1 of held item once after 60 seconds of AFK
+#   /afkzone reward save vip_kit 1 300 60 10
+#     → once after 60s, then every 5 min (priority 10)
 #
-# Use /afkzone reward list to see all saved rewards.
+# interval=0 AND once_after=0 is rejected — the reward would never fire.
+# Manage rewards with:
+#   /afkzone reward list
+#   /afkzone reward remove <name>
+#   /afkzone reward enable|disable|toggle <name>
 # ============================================================
 # Legacy reward definitions (from config.yml) are no longer read.
 # Existing rewards from config.yml should be re-created using
