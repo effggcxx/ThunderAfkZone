@@ -278,14 +278,20 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
                 return;
             }
 
-            // Try online player first, then fall back to offline
+            // Try online player first, then fall back to offline.
+            // Use Paper's getOfflinePlayerIfCached(name) instead of
+            // Bukkit.getOfflinePlayer(name): the by-name Bukkit overload can
+            // trigger a synchronous Mojang API lookup when the player isn't in
+            // the local UUID cache, which blocks the main thread. The cached
+            // variant returns null instead of doing a network call, and the
+            // "must have logged in at least once" error path below already
+            // handles that case.
             Player onlineTarget = Bukkit.getPlayerExact(args[1]);
             if (onlineTarget != null) {
                 targetId = onlineTarget.getUniqueId();
                 targetName = onlineTarget.getName();
             } else {
-                // Try offline player
-                OfflinePlayer offlineTarget = Bukkit.getOfflinePlayer(args[1]);
+                OfflinePlayer offlineTarget = Bukkit.getOfflinePlayerIfCached(args[1]);
                 if (offlineTarget == null || (!offlineTarget.hasPlayedBefore() && !offlineTarget.isOnline())) {
                     msg(sender, "<red>Player not found: <white>" + args[1] + "</white></red>");
                     msg(sender, "<gray>The player must have logged in at least once.</gray>");
