@@ -25,7 +25,7 @@ exit_zone:
 
 # Message shown when a reward is received
 reward_received:
-  text: "<gold>You received reward: <yellow><reward></yellow></gold>"
+  text: "<gold>You received a reward: </gold>"
   display: "title"
 
 # Message shown when a reward fails to deliver
