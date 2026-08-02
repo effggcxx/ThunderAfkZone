@@ -28,13 +28,18 @@ import java.util.*;
  *   <li>{@link ZoneRewardSubcommands} - zonereward list/add/remove/clear</li>
  *   <li>{@link ZoneSubcommands} - wand, sel, cancel, create, list, info, remove, border</li>
  * </ul>
+ *
+ * <p>Every subcommand name (including aliases) is registered exactly once in
+ * {@link #registerSubcommands()}: execution and tab-completion for a given
+ * name live together in one {@link Subcommand} entry, instead of being kept
+ * in sync by hand across a root-name list, an execute switch, and a
+ * tab-complete switch. Adding a subcommand means adding one {@code register()}
+ * call here - nowhere else in this file needs to change.
  */
 public class AfkZoneCommand implements CommandExecutor, TabCompleter {
 
     private final Main plugin;
     private final ZoneManager zoneManager;
-    private final RewardManager rewardManager;
-    private final StorageService storageService;
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
     private final StatsSubcommands statsHandler;
@@ -42,26 +47,198 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
     private final ZoneRewardSubcommands zoneRewardHandler;
     private final ZoneSubcommands zoneHandler;
 
-    private static final List<String> ROOT_SUBS = Arrays.asList(
-            "wand", "sel", "create", "list", "info", "remove", "reload", "reward", "zonereward", "stats", "top", "border"
-    );
+    @FunctionalInterface
+    private interface Executor {
+        boolean execute(CommandSender sender, String[] args);
+    }
 
-    // Common number suggestions for tab completion
-    private static final List<String> AMOUNT_SUGGESTIONS = Arrays.asList("1", "2", "4", "8", "16", "32", "64");
-    private static final List<String> INTERVAL_SUGGESTIONS = Arrays.asList("0", "false", "30", "60", "120", "300", "600", "1800", "3600");
-    private static final List<String> ONCE_AFTER_SUGGESTIONS = Arrays.asList("0", "false", "30", "60", "120", "300", "600");
-    private static final List<String> PRIORITY_SUGGESTIONS = Arrays.asList("0", "1", "5", "10");
+    @FunctionalInterface
+    private interface Completer {
+        List<String> complete(CommandSender sender, String[] args);
+    }
+
+    /**
+     * One registered subcommand name. {@code showInRootTabComplete} is false
+     * for aliases (e.g. "wandsel", "delete") so {@code /afkzone <tab>} only
+     * suggests the canonical spelling, while the alias still works when typed.
+     */
+    private record Subcommand(Executor executor, Completer completer, boolean showInRootTabComplete) {
+        Subcommand(Executor executor, Completer completer) {
+            this(executor, completer, true);
+        }
+        Subcommand(Executor executor, Completer completer, boolean showInRootTabComplete) {
+            this.executor = executor;
+            this.completer = completer == null ? (s, a) -> Collections.emptyList() : completer;
+            this.showInRootTabComplete = showInRootTabComplete;
+        }
+    }
+
+    private final Map<String, Subcommand> subcommands = new LinkedHashMap<>();
 
     public AfkZoneCommand(Main plugin, ZoneManager zoneManager, RewardManager rewardManager) {
         this.plugin = plugin;
         this.zoneManager = zoneManager;
-        this.rewardManager = rewardManager;
-        this.storageService = plugin.getStorageService();
+        StorageService storageService = plugin.getStorageService();
 
         this.statsHandler = new StatsSubcommands(plugin, zoneManager, rewardManager, storageService);
         this.rewardHandler = new RewardSubcommands(plugin, zoneManager, rewardManager, storageService);
         this.zoneRewardHandler = new ZoneRewardSubcommands(plugin, zoneManager, rewardManager, storageService);
         this.zoneHandler = new ZoneSubcommands(plugin, zoneManager, rewardManager, storageService);
+
+        registerSubcommands();
+    }
+
+    private void register(String name, Executor executor, Completer completer) {
+        subcommands.put(name, new Subcommand(executor, completer));
+    }
+
+    private void register(String name, Executor executor) {
+        register(name, executor, null);
+    }
+
+    /** Registers an alias for an already-registered subcommand, hidden from root tab-complete. */
+    private void registerAlias(String alias, String canonicalName) {
+        Subcommand target = subcommands.get(canonicalName);
+        subcommands.put(alias, new Subcommand(target.executor(), target.completer(), false));
+    }
+
+    private void registerSubcommands() {
+        register("reload", (sender, args) -> {
+            if (!sender.hasPermission("afkzone.reload")) {
+                msg(sender, "<red>You don't have permission.</red>");
+                return true;
+            }
+            plugin.reloadAll();
+            msg(sender, "<green>ThunderAfkZone configuration reloaded (config + zones).</green>");
+            return true;
+        });
+
+        register("reward", rewardHandler::handleRewardCommand, rewardHandler::tabComplete);
+        register("zonereward", zoneRewardHandler::handleZoneRewardCommand, zoneRewardHandler::tabComplete);
+
+        register("wand", (sender, args) -> {
+            if (!(sender instanceof Player player)) {
+                msg(sender, "<red>Only players can use this command.</red>");
+                return true;
+            }
+            if (!sender.hasPermission("afkzone.wand")) {
+                msg(sender, "<red>You don't have permission.</red>");
+                return true;
+            }
+            zoneHandler.giveWand(player);
+            return true;
+        });
+
+        register("sel", (sender, args) -> {
+            if (!(sender instanceof Player player)) {
+                msg(sender, "<red>Only players can use this command.</red>");
+                return true;
+            }
+            if (!sender.hasPermission("afkzone.wand")) {
+                msg(sender, "<red>You don't have permission.</red>");
+                return true;
+            }
+            zoneHandler.showWandSelection(player);
+            return true;
+        });
+        registerAlias("wandsel", "sel");
+
+        register("cancel", (sender, args) -> {
+            if (!(sender instanceof Player player)) {
+                msg(sender, "<red>Only players can use this command.</red>");
+                return true;
+            }
+            if (!sender.hasPermission("afkzone.wand")) {
+                msg(sender, "<red>You don't have permission.</red>");
+                return true;
+            }
+            zoneHandler.cancelWandSelection(player);
+            return true;
+        });
+        registerAlias("wandcancel", "cancel");
+
+        register("create", (sender, args) -> {
+            if (!(sender instanceof Player player)) {
+                msg(sender, "<red>Only players can create zones.</red>");
+                return true;
+            }
+            if (!sender.hasPermission("afkzone.create")) {
+                msg(sender, "<red>You don't have permission.</red>");
+                return true;
+            }
+            if (args.length < 2) {
+                msg(sender, "<red>Usage: /afkzone create [name]</red>");
+                msg(sender, "<gray>First select a region with the wand tool (<yellow>/afkzone wand</yellow>).</gray>");
+                return true;
+            }
+            zoneHandler.createZoneFromWandSelection(player, args[1]);
+            return true;
+        }, zoneHandler::tabComplete);
+
+        register("list", (sender, args) -> {
+            if (!sender.hasPermission("afkzone.list")) {
+                msg(sender, "<red>You don't have permission.</red>");
+                return true;
+            }
+            zoneHandler.listZones(sender);
+            return true;
+        });
+
+        register("info", (sender, args) -> {
+            if (!sender.hasPermission("afkzone.info")) {
+                msg(sender, "<red>You don't have permission.</red>");
+                return true;
+            }
+            if (args.length < 2) {
+                msg(sender, "<red>Usage: /afkzone info [name]</red>");
+                msg(sender, "<gray>Available zones: <white>" + String.join("</white>, <white>", zoneManager.getZoneNames()) + "</white></gray>");
+                return true;
+            }
+            zoneHandler.showZoneInfo(sender, args[1]);
+            return true;
+        }, zoneHandler::tabComplete);
+
+        register("remove", (sender, args) -> {
+            if (!sender.hasPermission("afkzone.remove")) {
+                msg(sender, "<red>You don't have permission.</red>");
+                return true;
+            }
+            if (args.length < 2) {
+                msg(sender, "<red>Usage: /afkzone remove [name]</red>");
+                msg(sender, "<gray>Available zones: <white>" + String.join("</white>, <white>", zoneManager.getZoneNames()) + "</white></gray>");
+                return true;
+            }
+            zoneHandler.removeZone(sender, args[1]);
+            return true;
+        }, zoneHandler::tabComplete);
+        registerAlias("delete", "remove");
+
+        register("stats", (sender, args) -> {
+            if (!sender.hasPermission("afkzone.stats")) {
+                msg(sender, "<red>You don't have permission.</red>");
+                return true;
+            }
+            statsHandler.handleStats(sender, args);
+            return true;
+        }, statsHandler::tabComplete);
+
+        register("top", (sender, args) -> {
+            if (!sender.hasPermission("afkzone.top")) {
+                msg(sender, "<red>You don't have permission.</red>");
+                return true;
+            }
+            statsHandler.handleTop(sender, args);
+            return true;
+        }, statsHandler::tabComplete);
+
+        register("border", (sender, args) -> {
+            if (!(sender instanceof Player player)) {
+                msg(sender, "<red>Only players can use this command.</red>");
+                return true;
+            }
+            zoneHandler.handleBorder(player, args);
+            return true;
+        }, zoneHandler::tabComplete);
     }
 
     private void msg(CommandSender sender, String miniText) {
@@ -80,139 +257,13 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
-        switch (sub) {
-            case "reload" -> {
-                if (!sender.hasPermission("afkzone.reload")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                plugin.reloadAll();
-                msg(sender, "<green>ThunderAfkZone configuration reloaded (config + zones).</green>");
-                return true;
-            }
-            case "reward" -> {
-                return rewardHandler.handleRewardCommand(sender, args);
-            }
-            case "zonereward" -> {
-                return zoneRewardHandler.handleZoneRewardCommand(sender, args);
-            }
-            case "wand" -> {
-                if (!(sender instanceof Player player)) {
-                    msg(sender, "<red>Only players can use this command.</red>");
-                    return true;
-                }
-                if (!sender.hasPermission("afkzone.wand")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                zoneHandler.giveWand(player);
-                return true;
-            }
-            case "sel", "wandsel" -> {
-                if (!(sender instanceof Player player)) {
-                    msg(sender, "<red>Only players can use this command.</red>");
-                    return true;
-                }
-                if (!sender.hasPermission("afkzone.wand")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                zoneHandler.showWandSelection(player);
-                return true;
-            }
-            case "cancel", "wandcancel" -> {
-                if (!(sender instanceof Player player)) {
-                    msg(sender, "<red>Only players can use this command.</red>");
-                    return true;
-                }
-                if (!sender.hasPermission("afkzone.wand")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                zoneHandler.cancelWandSelection(player);
-                return true;
-            }
-            case "create" -> {
-                if (!(sender instanceof Player player)) {
-                    msg(sender, "<red>Only players can create zones.</red>");
-                    return true;
-                }
-                if (!sender.hasPermission("afkzone.create")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                if (args.length < 2) {
-                    msg(sender, "<red>Usage: /afkzone create [name]</red>");
-                    msg(sender, "<gray>First select a region with the wand tool (<yellow>/afkzone wand</yellow>).</gray>");
-                    return true;
-                }
-                zoneHandler.createZoneFromWandSelection(player, args[1]);
-                return true;
-            }
-            case "list" -> {
-                if (!sender.hasPermission("afkzone.list")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                zoneHandler.listZones(sender);
-                return true;
-            }
-            case "info" -> {
-                if (!sender.hasPermission("afkzone.info")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                if (args.length < 2) {
-                    msg(sender, "<red>Usage: /afkzone info [name]</red>");
-                    msg(sender, "<gray>Available zones: <white>" + String.join("</white>, <white>", zoneManager.getZoneNames()) + "</white></gray>");
-                    return true;
-                }
-                zoneHandler.showZoneInfo(sender, args[1]);
-                return true;
-            }
-            case "remove", "delete" -> {
-                if (!sender.hasPermission("afkzone.remove")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                if (args.length < 2) {
-                    msg(sender, "<red>Usage: /afkzone remove [name]</red>");
-                    msg(sender, "<gray>Available zones: <white>" + String.join("</white>, <white>", zoneManager.getZoneNames()) + "</white></gray>");
-                    return true;
-                }
-                zoneHandler.removeZone(sender, args[1]);
-                return true;
-            }
-            case "stats" -> {
-                if (!sender.hasPermission("afkzone.stats")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                statsHandler.handleStats(sender, args);
-                return true;
-            }
-            case "top" -> {
-                if (!sender.hasPermission("afkzone.top")) {
-                    msg(sender, "<red>You don't have permission.</red>");
-                    return true;
-                }
-                statsHandler.handleTop(sender, args);
-                return true;
-            }
-            case "border" -> {
-                if (!(sender instanceof Player player)) {
-                    msg(sender, "<red>Only players can use this command.</red>");
-                    return true;
-                }
-                zoneHandler.handleBorder(player, args);
-                return true;
-            }
-            default -> {
-                msg(sender, "<red>Unknown command: <white>" + sub + "</white></red>");
-                msg(sender, "<gray>Use <yellow>/afkzone</yellow> to see all available commands.</gray>");
-                return true;
-            }
+        Subcommand subcommand = subcommands.get(sub);
+        if (subcommand == null) {
+            msg(sender, "<red>Unknown command: <white>" + sub + "</white></red>");
+            msg(sender, "<gray>Use <yellow>/afkzone</yellow> to see all available commands.</gray>");
+            return true;
         }
+        return subcommand.executor().execute(sender, args);
     }
 
     private void sendUsage(CommandSender sender) {
@@ -248,19 +299,18 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(ROOT_SUBS, args[0]);
+            List<String> rootNames = subcommands.entrySet().stream()
+                    .filter(e -> e.getValue().showInRootTabComplete())
+                    .map(Map.Entry::getKey)
+                    .toList();
+            return filter(rootNames, args[0]);
         }
 
         String sub = args[0].toLowerCase(Locale.ROOT);
-
-        return switch (sub) {
-            case "reward" -> rewardHandler.tabComplete(sender, args);
-            case "zonereward" -> zoneRewardHandler.tabComplete(sender, args);
-            case "stats" -> statsHandler.tabComplete(sender, args);
-            case "top" -> statsHandler.tabComplete(sender, args);
-            case "border", "info", "remove", "delete", "create" -> zoneHandler.tabComplete(sender, args);
-            default -> Collections.emptyList();
-        };
+        Subcommand subcommand = subcommands.get(sub);
+        if (subcommand == null) return Collections.emptyList();
+        List<String> result = subcommand.completer().complete(sender, args);
+        return result == null ? null : result;
     }
 
     private List<String> filter(List<String> options, String partial) {
