@@ -43,6 +43,14 @@ public class RewardManager {
     private int progressSaveCounter = 0;
     private static final int PROGRESS_SAVE_INTERVAL = 30; // seconds
 
+    // In-memory buffer for AFK-time seconds, flushed to storage periodically
+    // on an async thread instead of writing to storage synchronously every
+    // tick (see AfkTimeAccumulator for why - it used to be a main-thread
+    // blocking SQLite write per tracked player, every second).
+    private final AfkTimeAccumulator afkTimeAccumulator = new AfkTimeAccumulator();
+    private int statsFlushCounter = 0;
+    private static final int STATS_FLUSH_INTERVAL_SECONDS = 10;
+
     private String onMultiple = "all";
     private boolean resetProgressOnLeave = true;
     /** Seconds of inactivity required before reward progress ticks. 0 = no threshold (presence only). */
@@ -350,6 +358,10 @@ public class RewardManager {
             globalTask.cancel();
             globalTask = null;
         }
+        // Flush any buffered AFK time synchronously - there's no next tick
+        // left to do this async, and it needs to land before Main.onDisable()
+        // calls storageService.shutdown() and closes the connection.
+        flushAfkTimeSync();
         // Save all tracked players' progress before shutdown
         if (!resetProgressOnLeave && storageService.isPersistent()) {
             for (UUID id : playerTracker.getTrackedPlayers().keySet()) {
@@ -361,6 +373,14 @@ public class RewardManager {
     }
 
     private void tickAllPlayers() {
+        // Runs once per second regardless of whether anyone is tracked, so a
+        // straggler buffered right before everyone left still gets flushed.
+        statsFlushCounter++;
+        if (statsFlushCounter >= STATS_FLUSH_INTERVAL_SECONDS) {
+            statsFlushCounter = 0;
+            flushAfkTimeAsync();
+        }
+
         Map<UUID, String> tracked = playerTracker.getTrackedPlayers();
         if (tracked.isEmpty()) return;
 
@@ -375,6 +395,63 @@ public class RewardManager {
                         "Error ticking AFK player " + id + " - skipping this player for this tick, others unaffected", ex);
             }
         }
+    }
+
+    /**
+     * Drains the in-memory AFK-time buffer and writes it to storage on an
+     * async thread. This is the only place addAfkTime()/addZoneAfkTime() are
+     * called during normal operation - it replaces the old per-tick,
+     * per-player synchronous calls, moving the blocking storage I/O off the
+     * main thread and batching ~STATS_FLUSH_INTERVAL_SECONDS worth of seconds
+     * into one write per player instead of one write every second.
+     *
+     * Note: /afkzone top and PlaceholderAPI's top-list use pull straight from
+     * storage, so currently-tracked players' totals there can lag by up to
+     * STATS_FLUSH_INTERVAL_SECONDS. Live per-player views (/afkzone stats,
+     * %afkzone_afk_time%, %afkzone_zone_time_<zone>%) add the buffered amount
+     * back in via getPendingAfkSeconds()/getPendingZoneAfkSeconds() so those
+     * stay accurate to the second.
+     */
+    private void flushAfkTimeAsync() {
+        AfkTimeAccumulator.Snapshot snapshot = afkTimeAccumulator.drainAll();
+        if (snapshot.isEmpty()) return;
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> writeSnapshot(snapshot));
+    }
+
+    /**
+     * Synchronous variant used only on plugin shutdown, where there's no
+     * future server tick left to run an async task on and the write needs to
+     * happen before the storage connection closes.
+     */
+    private void flushAfkTimeSync() {
+        AfkTimeAccumulator.Snapshot snapshot = afkTimeAccumulator.drainAll();
+        if (!snapshot.isEmpty()) writeSnapshot(snapshot);
+    }
+
+    private void writeSnapshot(AfkTimeAccumulator.Snapshot snapshot) {
+        try {
+            for (Map.Entry<UUID, Long> e : snapshot.total().entrySet()) {
+                storageService.addAfkTime(e.getKey(), e.getValue());
+            }
+            for (Map.Entry<UUID, Map<String, Long>> e : snapshot.zone().entrySet()) {
+                for (Map.Entry<String, Long> zoneEntry : e.getValue().entrySet()) {
+                    storageService.addZoneAfkTime(e.getKey(), zoneEntry.getKey(), zoneEntry.getValue());
+                }
+            }
+        } catch (Exception ex) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "Storage error flushing buffered AFK time - this batch of stats is lost, tracking continues", ex);
+        }
+    }
+
+    /** Buffered AFK seconds not yet flushed to storage, for live display (e.g. /afkzone stats). */
+    public long getPendingAfkSeconds(UUID id) {
+        return afkTimeAccumulator.getPendingTotal(id);
+    }
+
+    /** Buffered per-zone AFK seconds not yet flushed to storage, for live display. */
+    public long getPendingZoneAfkSeconds(UUID id, String zoneName) {
+        return afkTimeAccumulator.getPendingZone(id, zoneName);
     }
 
     private void tickOnePlayer(UUID id) {
@@ -431,14 +508,9 @@ public class RewardManager {
         // Current-session counter
         playerTracker.incrementSession(id);
 
-        // Track time in storage
-        try {
-            storageService.addAfkTime(id, 1);
-            storageService.addZoneAfkTime(id, zoneName, 1);
-        } catch (Exception ex) {
-            plugin.getLogger().log(java.util.logging.Level.WARNING,
-                    "Storage error tracking AFK time for " + id + " - continuing without stats for this tick", ex);
-        }
+        // Buffer AFK time in memory only - no storage I/O on this (main) thread.
+        // Flushed periodically to storage on an async thread by flushAfkTimeAsync().
+        afkTimeAccumulator.add(id, zoneName);
 
         // Collect due rewards
         Set<Reward> due = rewardEvaluationService.evaluateDueRewards(zoneRewards, prog, given, onMultiple);

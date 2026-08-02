@@ -304,7 +304,10 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        long totalAfkTime = storageService.getTotalAfkTime(targetId);
+        // AFK time is flushed to storage periodically (not every second - see
+        // RewardManager.flushAfkTimeAsync), so add back what's currently
+        // buffered in memory to keep this display accurate to the second.
+        long totalAfkTime = storageService.getTotalAfkTime(targetId) + rewardManager.getPendingAfkSeconds(targetId);
         int rewardsReceived = storageService.getTotalRewardsReceived(targetId);
 
         msg(sender, "<yellow>Statistics for <white>" + targetName + "</white>:</yellow>");
@@ -323,7 +326,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         msg(sender, "  <gray>Per-zone AFK time:</gray>");
         boolean hasZoneStats = false;
         for (String zone : zoneManager.getZoneNames()) {
-            long zoneTime = storageService.getZoneAfkTime(targetId, zone);
+            long zoneTime = storageService.getZoneAfkTime(targetId, zone) + rewardManager.getPendingZoneAfkSeconds(targetId, zone);
             if (zoneTime > 0) {
                 hasZoneStats = true;
                 msg(sender, "   <dark_gray>- <white>" + zone + "</white>: <gray>" + MessageUtils.formatDuration(zoneTime) + "</gray>");

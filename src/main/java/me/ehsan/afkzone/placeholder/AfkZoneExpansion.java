@@ -97,14 +97,17 @@ public class AfkZoneExpansion extends PlaceholderExpansion {
                 return String.valueOf(storageService.getTotalRewardsReceived(id));
             }
             case "afk_time" -> {
-                long seconds = storageService.getTotalAfkTime(id);
+                // AFK time is flushed to storage periodically, not every second
+                // (see RewardManager.flushAfkTimeAsync) - add back what's still
+                // buffered in memory so this placeholder stays accurate.
+                long seconds = storageService.getTotalAfkTime(id) + rewardManager.getPendingAfkSeconds(id);
                 return MessageUtils.formatDuration(seconds);
             }
             default -> {
                 // Handle zone-specific placeholders: zone_time_<zone>
                 if (params.startsWith("zone_time_")) {
                     String zoneName = params.substring("zone_time_".length());
-                    long seconds = storageService.getZoneAfkTime(id, zoneName);
+                    long seconds = storageService.getZoneAfkTime(id, zoneName) + rewardManager.getPendingZoneAfkSeconds(id, zoneName);
                     return MessageUtils.formatDuration(seconds);
                 }
                 return "";
