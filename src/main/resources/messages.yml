@@ -12,30 +12,31 @@
 #   <timer>  - Time until next reward (e.g. "5:00")
 #   <player> - Player name
 # ============================================================
-
+# I highly recommend checking this documentation to fully utilize configurable messages :
+# https://docs.papermc.io/adventure/minimessage/format/
 # Message shown when entering a zone
 enter_zone:
-  text: "<green>Entered AFK zone: <yellow><zone></yellow></green>"
+  text: "<c:green><b><shadow:black:1>You entered AFK zone"
   display: "title"
 
 # Message shown when leaving a zone
 exit_zone:
-  text: "<gray>You left AFK zone: <yellow><zone></yellow></gray>"
+  text: "<c:dark_red><shadow:black:1><b>You left AFK zone"
   display: "title"
 
 # Message shown when a reward is received
 reward_received:
-  text: "<gold>You received a reward: </gold>"
+  text: "<c:gold><shadow:black:1><b>You received a reward!"
   display: "title"
 
 # Message shown when a reward fails to deliver
 reward_failed:
-  text: "<red>Reward '<reward>' could not be delivered. Please contact staff.</red>"
+  text: "<c:dark_red><shadow:black:1><b><hover:show_text:'<red>Please Contact Staff.'>Reward '<reward>' could not be delivered."
   display: "chat"
 
 # Message shown when the player's inventory is full and the reward drops on the ground
 inventory_full:
-  text: "<red>Your inventory was full! Reward '<reward>' fell on the ground.</red>"
+  text: "<c:dark_red><shadow:black:1><b>Your inventory was full! Reward '<reward>' fell on the ground."
   display: "chat"
 
 # Timer countdown shown while in a zone
