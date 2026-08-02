@@ -2,9 +2,13 @@
 # ThunderAfkZone - Messages Configuration
 # ============================================================
 # All player-facing messages are configurable here.
-# Each message has:
+# Each regular message has:
 #   text:    The message content (MiniMessage format)
 #   display: How to show it - "chat" | "title" | "actionbar" | "bossbar"
+#
+# The timer message supports these extra options:
+#   size: "big" or "mini"
+#   title.fade_in, title.stay, title.fade_out (only used when the timer is shown as a title)
 #
 # Placeholders:
 #   <zone>   - Zone name
@@ -44,7 +48,3 @@ timer:
   text: "<gradient:#aa00aa:#ff55ff><b><timer> remaining until next reward"
   display: "bossbar"
   size: "big"           # "big" or "mini"
-  title:
-    fade_in: 5
-    stay: 40
-    fade_out: 5

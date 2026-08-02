@@ -14,6 +14,8 @@ import java.util.logging.Level;
 public class MessagesConfig {
 
     private final Main plugin;
+    private final File dataFolder;
+    private final java.util.logging.Logger logger;
     private FileConfiguration messages;
 
     // Message data: text + display mode
@@ -26,15 +28,28 @@ public class MessagesConfig {
 
     public MessagesConfig(Main plugin) {
         this.plugin = plugin;
+        this.dataFolder = plugin.getDataFolder();
+        this.logger = plugin.getLogger();
+    }
+
+    public MessagesConfig(File dataFolder, java.util.logging.Logger logger) {
+        this.plugin = null;
+        this.dataFolder = dataFolder;
+        this.logger = logger;
     }
 
     /**
      * Loads (or reloads) messages.yml from disk.
      */
     public void load() {
-        File file = new File(plugin.getDataFolder(), "messages.yml");
+        File file = new File(dataFolder, "messages.yml");
         if (!file.exists()) {
-            plugin.saveResource("messages.yml", false);
+            if (plugin != null) {
+                plugin.saveResource("messages.yml", false);
+            } else {
+                logger.warning("messages.yml not found in " + dataFolder + " and no plugin instance was supplied to create it.");
+                return;
+            }
         }
         messages = YamlConfiguration.loadConfiguration(file);
 
@@ -45,13 +60,16 @@ public class MessagesConfig {
         inventoryFull = loadMessageEntry("inventory_full");
         timer = loadTimerMessageEntry("timer");
 
-        plugin.getLogger().info("Messages config loaded (" + file.getAbsolutePath() + ")");
+        logger.info("Messages config loaded (" + file.getAbsolutePath() + ")");
     }
 
     private MessageEntry loadMessageEntry(String path) {
         String text = messages.getString(path + ".text", "");
         String display = messages.getString(path + ".display", "chat");
-        return new MessageEntry(text, display);
+        int fadeIn = messages.getInt(path + ".title.fade_in", 5);
+        int stay = messages.getInt(path + ".title.stay", 40);
+        int fadeOut = messages.getInt(path + ".title.fade_out", 5);
+        return new MessageEntry(text, display, fadeIn, stay, fadeOut);
     }
 
     private TimerMessageEntry loadTimerMessageEntry(String path) {
@@ -78,14 +96,27 @@ public class MessagesConfig {
     public static class MessageEntry {
         private final String text;
         private final String display;
+        private final int titleFadeIn;
+        private final int titleStay;
+        private final int titleFadeOut;
 
         public MessageEntry(String text, String display) {
+            this(text, display, 5, 40, 5);
+        }
+
+        public MessageEntry(String text, String display, int titleFadeIn, int titleStay, int titleFadeOut) {
             this.text = text;
             this.display = display;
+            this.titleFadeIn = titleFadeIn;
+            this.titleStay = titleStay;
+            this.titleFadeOut = titleFadeOut;
         }
 
         public String getText() { return text; }
         public String getDisplay() { return display; }
+        public int getTitleFadeIn() { return titleFadeIn; }
+        public int getTitleStay() { return titleStay; }
+        public int getTitleFadeOut() { return titleFadeOut; }
     }
 
     public static class TimerMessageEntry extends MessageEntry {

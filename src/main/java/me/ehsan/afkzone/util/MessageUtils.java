@@ -50,9 +50,9 @@ public final class MessageUtils {
             case "actionbar" -> player.sendActionBar(component);
             case "title" -> player.showTitle(Title.title(component, Component.empty(),
                     Title.Times.times(
-                            Duration.ofMillis(5 * 50L),
-                            Duration.ofMillis(40 * 50L),
-                            Duration.ofMillis(5 * 50L)
+                            Duration.ofMillis((entry.getTitleFadeIn() > 0 ? entry.getTitleFadeIn() : 5) * 50L),
+                            Duration.ofMillis((entry.getTitleStay() > 0 ? entry.getTitleStay() : 40) * 50L),
+                            Duration.ofMillis((entry.getTitleFadeOut() > 0 ? entry.getTitleFadeOut() : 5) * 50L)
                     )));
             case "bossbar" -> {
                 BossBar bar = BossBar.bossBar(component, 1f, BossBar.Color.YELLOW, BossBar.Overlay.PROGRESS);
