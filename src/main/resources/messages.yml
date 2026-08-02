@@ -41,7 +41,7 @@ inventory_full:
 
 # Timer countdown shown while in a zone
 timer:
-  text: "<timer> remaining until next reward"
+  text: "<gradient:#aa00aa:#ff55ff><b><timer> remaining until next reward"
   display: "bossbar"
   size: "big"           # "big" or "mini"
   title:
