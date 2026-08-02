@@ -9,6 +9,7 @@ import me.ehsan.afkzone.models.Reward;
 import me.ehsan.afkzone.models.WandSelection;
 import me.ehsan.afkzone.storage.StorageService;
 import me.ehsan.afkzone.util.MessageUtils;
+import me.ehsan.afkzone.util.NameValidator;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -502,7 +503,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
 
         // Validate name has no special characters
-        if (!name.matches("[a-zA-Z0-9_\\-]+")) {
+        if (!NameValidator.isValidName(name)) {
             msg(sender, "<red>Reward name can only contain letters, numbers, underscores, and hyphens.</red>");
             msg(sender, "<gray>Examples: <white>welcome_diamond</white>, <white>vip-sword</white>, <white>token1</white></gray>");
             return true;
@@ -1074,7 +1075,7 @@ public class AfkZoneCommand implements CommandExecutor, TabCompleter {
         }
 
         // Validate zone name
-        if (!name.matches("[a-zA-Z0-9_\\-]+")) {
+        if (!NameValidator.isValidName(name)) {
             msg(player, "<red>Zone name can only contain letters, numbers, underscores, and hyphens.</red>");
             return;
         }
