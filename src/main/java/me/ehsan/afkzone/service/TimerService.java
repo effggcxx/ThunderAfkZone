@@ -39,7 +39,8 @@ public class TimerService {
     public void sendTimer(Player player, long secondsRemaining, long totalSeconds, String zoneName) {
         if (!enabled || timerConfig == null) return;
         MessageUtils.sendTimer(player, timerConfig.getDisplay(), timerConfig.getText(),
-                timerConfig.getTitleFadeIn(), timerConfig.getTitleStay(), timerConfig.getTitleFadeOut(), true,
+                timerConfig.getTitleFadeIn(), timerConfig.getTitleStay(), timerConfig.getTitleFadeOut(),
+                timerConfig.getBossBarColor(), true,
                 secondsRemaining, totalSeconds, zoneName, activeBossBars);
     }
 

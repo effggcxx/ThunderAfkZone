@@ -231,15 +231,18 @@ enter_zone:
 timer:
   text: "<timer> remaining until next reward"
   display: "bossbar"
+  bossbar_color: "purple"   # PINK | BLUE | RED | GREEN | YELLOW | PURPLE | WHITE
   title:
     fade_in: 5
     stay: 40
     fade_out: 5
 ```
 
-The `title:` block (`fade_in`/`stay`/`fade_out`, in ticks) works on *any* message
-above, not just `timer` — it's just only read when that message's own
-`display` is `"title"`.
+The `title:` block (`fade_in`/`stay`/`fade_out`, in ticks) and `bossbar_color`
+both work on *any* message above, not just `timer` — each is only read when
+that message's own `display` is set to `"title"` or `"bossbar"` respectively.
+`bossbar_color` defaults to `"purple"` on the `timer` entry and `"yellow"`
+everywhere else.
 
 Placeholders available: `<zone>`, `<reward>`, `<timer>`, `<player>` (not all
 apply to every message — `<timer>` only makes sense in the `timer` entry).

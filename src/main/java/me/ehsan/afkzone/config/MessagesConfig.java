@@ -1,6 +1,8 @@
 package me.ehsan.afkzone.config;
 
 import me.ehsan.afkzone.Main;
+import me.ehsan.afkzone.util.MessageUtils;
+import net.kyori.adventure.bossbar.BossBar;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -69,7 +71,10 @@ public class MessagesConfig {
         int fadeIn = messages.getInt(path + ".title.fade_in", 5);
         int stay = messages.getInt(path + ".title.stay", 40);
         int fadeOut = messages.getInt(path + ".title.fade_out", 5);
-        return new MessageEntry(text, display, fadeIn, stay, fadeOut);
+        BossBar.Color bossBarColor = MessageUtils.parseBossBarColor(
+                messages.getString(path + ".bossbar_color", "yellow"),
+                BossBar.Color.YELLOW, logger, path + ".bossbar_color");
+        return new MessageEntry(text, display, fadeIn, stay, fadeOut, bossBarColor);
     }
 
     private TimerMessageEntry loadTimerMessageEntry(String path) {
@@ -78,7 +83,12 @@ public class MessagesConfig {
         int fadeIn = messages.getInt(path + ".title.fade_in", 5);
         int stay = messages.getInt(path + ".title.stay", 40);
         int fadeOut = messages.getInt(path + ".title.fade_out", 5);
-        return new TimerMessageEntry(text, display, fadeIn, stay, fadeOut);
+        // Timer defaults to purple instead of the generic yellow default, since
+        // it's the message most likely to actually be shown as a boss bar.
+        BossBar.Color bossBarColor = MessageUtils.parseBossBarColor(
+                messages.getString(path + ".bossbar_color", "purple"),
+                BossBar.Color.PURPLE, logger, path + ".bossbar_color");
+        return new TimerMessageEntry(text, display, fadeIn, stay, fadeOut, bossBarColor);
     }
 
     // --- Getters ---
@@ -98,17 +108,19 @@ public class MessagesConfig {
         private final int titleFadeIn;
         private final int titleStay;
         private final int titleFadeOut;
+        private final BossBar.Color bossBarColor;
 
         public MessageEntry(String text, String display) {
-            this(text, display, 5, 40, 5);
+            this(text, display, 5, 40, 5, BossBar.Color.YELLOW);
         }
 
-        public MessageEntry(String text, String display, int titleFadeIn, int titleStay, int titleFadeOut) {
+        public MessageEntry(String text, String display, int titleFadeIn, int titleStay, int titleFadeOut, BossBar.Color bossBarColor) {
             this.text = text;
             this.display = display;
             this.titleFadeIn = titleFadeIn;
             this.titleStay = titleStay;
             this.titleFadeOut = titleFadeOut;
+            this.bossBarColor = bossBarColor;
         }
 
         public String getText() { return text; }
@@ -116,23 +128,27 @@ public class MessagesConfig {
         public int getTitleFadeIn() { return titleFadeIn; }
         public int getTitleStay() { return titleStay; }
         public int getTitleFadeOut() { return titleFadeOut; }
+        public BossBar.Color getBossBarColor() { return bossBarColor; }
     }
 
     public static class TimerMessageEntry extends MessageEntry {
         private final int titleFadeIn;
         private final int titleStay;
         private final int titleFadeOut;
+        private final BossBar.Color bossBarColor;
 
         public TimerMessageEntry(String text, String display,
-                                 int titleFadeIn, int titleStay, int titleFadeOut) {
+                                 int titleFadeIn, int titleStay, int titleFadeOut, BossBar.Color bossBarColor) {
             super(text, display);
             this.titleFadeIn = titleFadeIn;
             this.titleStay = titleStay;
             this.titleFadeOut = titleFadeOut;
+            this.bossBarColor = bossBarColor;
         }
 
         public int getTitleFadeIn() { return titleFadeIn; }
         public int getTitleStay() { return titleStay; }
         public int getTitleFadeOut() { return titleFadeOut; }
+        public BossBar.Color getBossBarColor() { return bossBarColor; }
     }
 }

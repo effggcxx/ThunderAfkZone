@@ -9,6 +9,10 @@
 # Every message supports:
 #   title.fade_in, title.stay, title.fade_out - only read/used when that
 #   message's own "display" is set to "title". Values are in ticks (20 = 1s).
+#   bossbar_color - only read/used when that message's "display" is set to
+#   "bossbar". One of: PINK, BLUE, RED, GREEN, YELLOW, PURPLE, WHITE
+#   (case-insensitive). Defaults to "yellow", except the timer message below,
+#   which defaults to "purple".
 #
 # Placeholders:
 #   <zone>   - Zone name
@@ -54,3 +58,4 @@ inventory_full:
 timer:
   text: "<gradient:#aa00aa:#ff55ff><b><timer> remaining until next reward"
   display: "bossbar"
+  bossbar_color: "purple"   # PINK | BLUE | RED | GREEN | YELLOW | PURPLE | WHITE

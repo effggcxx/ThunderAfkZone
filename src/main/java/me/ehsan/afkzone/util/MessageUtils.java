@@ -55,7 +55,8 @@ public final class MessageUtils {
                             Duration.ofMillis((entry.getTitleFadeOut() > 0 ? entry.getTitleFadeOut() : 5) * 50L)
                     )));
             case "bossbar" -> {
-                BossBar bar = BossBar.bossBar(component, 1f, BossBar.Color.YELLOW, BossBar.Overlay.PROGRESS);
+                BossBar.Color color = entry.getBossBarColor() != null ? entry.getBossBarColor() : BossBar.Color.YELLOW;
+                BossBar bar = BossBar.bossBar(component, 1f, color, BossBar.Overlay.PROGRESS);
                 player.showBossBar(bar);
                 // Auto-hide after 3 seconds
                 org.bukkit.Bukkit.getScheduler().runTaskLater(
@@ -98,6 +99,7 @@ public final class MessageUtils {
     public static void sendTimer(Player player, String timerDisplay,
                                   String timerTemplate,
                                   int titleFadeIn, int titleStay, int titleFadeOut,
+                                  BossBar.Color bossBarColor,
                                   boolean timerEnabled, long secondsRemaining, long totalSeconds,
                                   String zoneName, Map<UUID, BossBar> activeBossBars) {
         if (!timerEnabled) return;
@@ -113,7 +115,8 @@ public final class MessageUtils {
                         : 0f;
                 BossBar bar = activeBossBars.get(id);
                 if (bar == null) {
-                    bar = BossBar.bossBar(component, progress, BossBar.Color.YELLOW, BossBar.Overlay.PROGRESS);
+                    BossBar.Color color = bossBarColor != null ? bossBarColor : BossBar.Color.PURPLE;
+                    bar = BossBar.bossBar(component, progress, color, BossBar.Overlay.PROGRESS);
                     activeBossBars.put(id, bar);
                     player.showBossBar(bar);
                 } else {
@@ -159,6 +162,24 @@ public final class MessageUtils {
         } catch (IllegalArgumentException ex) {
             logger.warning("Invalid sound name in config path " + configPath + ": '" + soundName + "'. Sound disabled.");
             return null;
+        }
+    }
+
+    /**
+     * Parses a boss bar color name from config (e.g. "purple", "yellow"), falling
+     * back to {@code fallback} with a warning if the value is missing or invalid.
+     * Unlike {@link #parseSound}, the fallback is caller-supplied rather than a
+     * fixed default, since different messages want different defaults (the timer
+     * defaults to purple; other messages default to yellow).
+     */
+    public static BossBar.Color parseBossBarColor(String colorName, BossBar.Color fallback, Logger logger, String configPath) {
+        if (colorName == null || colorName.isEmpty()) return fallback;
+        try {
+            return BossBar.Color.valueOf(colorName.toUpperCase(Locale.ROOT).trim());
+        } catch (IllegalArgumentException ex) {
+            logger.warning("Invalid boss bar color in config path " + configPath + ": '" + colorName +
+                    "'. Valid values: " + java.util.Arrays.toString(BossBar.Color.values()) + ". Using " + fallback + ".");
+            return fallback;
         }
     }
 
