@@ -82,17 +82,12 @@ public final class MessageUtils {
         }
     }
 
-    public static Component buildTimerComponent(String timerTemplate, String timerSize,
+    public static Component buildTimerComponent(String timerTemplate,
                                                  long secondsRemaining, String zoneName, String playerName) {
         String text = timerTemplate
                 .replace("<timer>", formatTime(secondsRemaining))
                 .replace("<zone>", zoneName == null ? "" : zoneName)
                 .replace("<player>", playerName == null ? "" : playerName);
-        if ("mini".equalsIgnoreCase(timerSize)) {
-            text = "<gray><italic>" + text + "</italic></gray>";
-        } else if ("big".equalsIgnoreCase(timerSize)) {
-            text = "<gold><bold>" + text + "</bold></gold>";
-        }
         try {
             return MINI_MESSAGE.deserialize(text);
         } catch (Exception ex) {
@@ -101,12 +96,12 @@ public final class MessageUtils {
     }
 
     public static void sendTimer(Player player, String timerDisplay,
-                                  String timerTemplate, String timerSize,
+                                  String timerTemplate,
                                   int titleFadeIn, int titleStay, int titleFadeOut,
                                   boolean timerEnabled, long secondsRemaining, long totalSeconds,
                                   String zoneName, Map<UUID, BossBar> activeBossBars) {
         if (!timerEnabled) return;
-        Component component = buildTimerComponent(timerTemplate, timerSize, secondsRemaining, zoneName, player.getName());
+        Component component = buildTimerComponent(timerTemplate, secondsRemaining, zoneName, player.getName());
         UUID id = player.getUniqueId();
 
         switch (timerDisplay.toLowerCase(Locale.ROOT)) {

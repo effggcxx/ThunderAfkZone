@@ -2,13 +2,13 @@
 # ThunderAfkZone - Messages Configuration
 # ============================================================
 # All player-facing messages are configurable here.
-# Each regular message has:
+# Each message has:
 #   text:    The message content (MiniMessage format)
 #   display: How to show it - "chat" | "title" | "actionbar" | "bossbar"
 #
-# The timer message supports these extra options:
-#   size: "big" or "mini"
-#   title.fade_in, title.stay, title.fade_out (only used when the timer is shown as a title)
+# Every message supports:
+#   title.fade_in, title.stay, title.fade_out - only read/used when that
+#   message's own "display" is set to "title". Values are in ticks (20 = 1s).
 #
 # Placeholders:
 #   <zone>   - Zone name
@@ -22,6 +22,13 @@
 enter_zone:
   text: "<c:green><b><shadow:black:1>You entered AFK zone"
   display: "title"
+  # Uncomment to override how long this title takes to fade in/stay/fade out
+  # (ticks, 20 = 1s). Defaults shown below; this block works the same way
+  # on any message whose display is "title", not just this one.
+  # title:
+  #   fade_in: 5
+  #   stay: 40
+  #   fade_out: 5
 
 # Message shown when leaving a zone
 exit_zone:
@@ -47,4 +54,3 @@ inventory_full:
 timer:
   text: "<gradient:#aa00aa:#ff55ff><b><timer> remaining until next reward"
   display: "bossbar"
-  size: "big"           # "big" or "mini"

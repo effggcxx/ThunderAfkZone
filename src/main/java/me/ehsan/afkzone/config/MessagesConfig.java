@@ -75,11 +75,10 @@ public class MessagesConfig {
     private TimerMessageEntry loadTimerMessageEntry(String path) {
         String text = messages.getString(path + ".text", "<timer> remaining until next reward");
         String display = messages.getString(path + ".display", "bossbar");
-        String size = messages.getString(path + ".size", "big");
         int fadeIn = messages.getInt(path + ".title.fade_in", 5);
         int stay = messages.getInt(path + ".title.stay", 40);
         int fadeOut = messages.getInt(path + ".title.fade_out", 5);
-        return new TimerMessageEntry(text, display, size, fadeIn, stay, fadeOut);
+        return new TimerMessageEntry(text, display, fadeIn, stay, fadeOut);
     }
 
     // --- Getters ---
@@ -120,21 +119,18 @@ public class MessagesConfig {
     }
 
     public static class TimerMessageEntry extends MessageEntry {
-        private final String size;
         private final int titleFadeIn;
         private final int titleStay;
         private final int titleFadeOut;
 
-        public TimerMessageEntry(String text, String display, String size,
+        public TimerMessageEntry(String text, String display,
                                  int titleFadeIn, int titleStay, int titleFadeOut) {
             super(text, display);
-            this.size = size;
             this.titleFadeIn = titleFadeIn;
             this.titleStay = titleStay;
             this.titleFadeOut = titleFadeOut;
         }
 
-        public String getSize() { return size; }
         public int getTitleFadeIn() { return titleFadeIn; }
         public int getTitleStay() { return titleStay; }
         public int getTitleFadeOut() { return titleFadeOut; }

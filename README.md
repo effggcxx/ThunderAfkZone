@@ -231,14 +231,15 @@ enter_zone:
 timer:
   text: "<timer> remaining until next reward"
   display: "bossbar"
-  size: "mini"               # "big" or "mini" - color/boldness only, not a
-                              # literal font-size (Minecraft doesn't support
-                              # that); applies to whichever display mode above
   title:
     fade_in: 5
     stay: 40
     fade_out: 5
 ```
+
+The `title:` block (`fade_in`/`stay`/`fade_out`, in ticks) works on *any* message
+above, not just `timer` — it's just only read when that message's own
+`display` is `"title"`.
 
 Placeholders available: `<zone>`, `<reward>`, `<timer>`, `<player>` (not all
 apply to every message — `<timer>` only makes sense in the `timer` entry).
