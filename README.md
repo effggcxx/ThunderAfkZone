@@ -1,61 +1,4 @@
-# ThunderAfkZone
-
-A Paper 1.21+ plugin for AFK reward zones: define cuboid regions with the
-built-in selection wand, give players rewards for staying AFK inside them,
-and track statistics per player and per zone.
-
-## Features
-
-- **Built-in zone selection wand** — no external dependency needed. Left-click
-  sets corner 1, right-click sets corner 2.
-- **Item-based rewards** — hold the item you want to give, run one command to
-  save it as a reward (full NBT/enchants/lore preserved), and set it to repeat
-  on an interval or fire once. Given via direct inventory delivery, with
-  overflow dropped naturally if the player's inventory is full.
-- **Enable / disable / remove rewards in-game** — pause or delete rewards
-  without touching files.
-- **Per-zone reward restrictions** — by default every zone shares the same
-  global reward pool; optionally restrict specific zones to a subset of rewards.
-- **Per-zone enter/exit commands** — run arbitrary console commands when a
-  player enters or leaves a zone.
-- **Zone border particles** — toggle a particle outline of nearby zones
-  (`/afkzone border`), visible only to you.
-- **Overlap protection** — creating a zone that overlaps an existing one is
-  blocked with a clear error naming the conflicting zone.
-- **Fully configurable messages** — every player-facing message (enter, exit,
-  reward received/failed, inventory-full, timer) has its own text and display
-  mode (chat/title/actionbar/boss bar), set independently in `messages.yml`.
-- **Persistent or in-memory storage** — SQLite for stats that survive restarts,
-  or plain in-memory tracking if you don't need persistence.
-- **Player statistics** — lifetime AFK time, per-zone AFK time, and rewards
-  received, plus `/afkzone top` leaderboards.
-- **PlaceholderAPI support** — expose AFK status and stats to scoreboards,
-  holograms, or anywhere else placeholders are read.
-
-## Requirements
-
-| Dependency | Required? | Notes |
-|---|---|---|
-| Paper 1.21+ | Yes | Built against `paper-api:1.21.8` |
-| PlaceholderAPI | Only if you want the placeholders | Soft dependency |
-
-No external plugin is needed for zone selection or rewards — both are fully
-built in.
-
-If `global.storage: "sqlite"` is set in `config.yml`, the SQLite JDBC driver is
-downloaded automatically by Paper at startup (declared in `plugin.yml`'s
-`libraries:` block) — no manual setup needed. Check your server log on first
-boot for `SQLite storage initialized`; if you instead see a warning about
-failed initialization, switch to `storage: "memory"` until it's resolved.
-
-## Installation
-
-1. Drop the built jar into your server's `plugins/` folder.
-2. Start the server once to generate `config.yml` and `zones.yml`.
-3. Edit `config.yml` if needed, then reload or restart.
-4. Run `/afkzone wand` to get the selection tool and create your first zone
-   (see below).
-5. Hold an item and run `/afkzone reward save <name> ...` to create rewards.
+# ThunderAfkZone — Full Documentation
 
 ## Creating a zone with the wand
 
@@ -269,16 +212,6 @@ Requires PlaceholderAPI installed. Placeholders:
 | `%afkzone_afk_time%` | Lifetime total AFK time (persists across zone visits and restarts) |
 | `%afkzone_zone_time_<zone>%` | Lifetime AFK time in a specific named zone |
 
-## Building from source
-
-Requires Java 21.
-
-```bash
-./gradlew build
-```
-
-The built jar is output to `build/libs/`.
-
 ## Wand configuration (`config.yml`)
 
 ```yaml
@@ -301,4 +234,20 @@ Set `global.storage` in `config.yml` to:
 
 - `"memory"` — no setup required, but AFK time and reward counts reset on every restart.
 - `"sqlite"` — persists to `afkzone.db` in the plugin's data folder. Requires the
-  bundled SQLite driver to load successfully on startup (see Requirements above).
+  bundled SQLite driver to load successfully on startup.
+
+If `global.storage: "sqlite"` is set, the SQLite JDBC driver is downloaded
+automatically by Paper at startup (declared in `plugin.yml`'s `libraries:`
+block) — no manual setup needed. Check your server log on first boot for
+`SQLite storage initialized`; if you instead see a warning about failed
+initialization, switch to `storage: "memory"` until it's resolved.
+
+## Building from source
+
+Requires Java 21.
+
+```bash
+./gradlew build
+```
+
+The built jar is output to `build/libs/`.
